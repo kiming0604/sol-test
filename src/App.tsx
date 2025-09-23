@@ -5,6 +5,8 @@ import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
 
 // Phantom Wallet 타입 정의
+
+// Solana 라이브러리 타입 선언 (동적 import용)
 interface PhantomWallet {
   isPhantom?: boolean;
   connect: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: { toString: () => string } }>;
@@ -161,9 +163,9 @@ function App() {
         console.log('=== 올바른 Phantom Wallet SPL 토큰 전송 시도 ===');
         
         try {
-          // @solana/web3.js와 @solana/spl-token 라이브러리 사용
-          const { Connection, PublicKey, Transaction, SystemProgram } = await import('@solana/web3.js');
-          const { createTransferInstruction, getAssociatedTokenAddress } = await import('@solana/spl-token');
+          // @solana/web3.js와 @solana/spl-token 라이브러리 동적 로드
+          const { Connection, PublicKey, Transaction, SystemProgram } = await import('@solana/web3.js') as any;
+          const { createTransferInstruction, getAssociatedTokenAddress } = await import('@solana/spl-token') as any;
           
           console.log('Solana 라이브러리 로드 성공');
           
