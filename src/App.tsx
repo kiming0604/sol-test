@@ -281,7 +281,7 @@ function App() {
               
               return;
             }
-          } catch (error) {
+          } catch (error: any) {
             console.log(`${format.name} 실패:`, error);
             console.log('에러 타입:', typeof error);
             console.log('에러 메시지:', error?.message || 'No message');
