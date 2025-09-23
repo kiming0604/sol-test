@@ -100,17 +100,85 @@ function App() {
       try {
         console.log('팬텀 월렛의 실제 API 시도...');
         
-        // 팬텀 월렛에서 실제로 지원하는 방법을 시도해보겠습니다
+        // 먼저 토큰 계정들을 찾아보겠습니다
+        console.log('토큰 계정 조회 중...');
+        
+        // 현재 지갑의 토큰 계정 조회
+        const tokenAccountsResponse = await fetch('https://api.devnet.solana.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getTokenAccountsByOwner',
+            params: [
+              walletAddress,
+              { mint: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV' },
+              { encoding: 'jsonParsed' }
+            ]
+          })
+        });
+
+        const tokenAccountsData = await tokenAccountsResponse.json();
+        console.log('토큰 계정 조회 결과:', tokenAccountsData);
+
+        if (!tokenAccountsData.result || !tokenAccountsData.result.value || tokenAccountsData.result.value.length === 0) {
+          throw new Error('소스 토큰 계정을 찾을 수 없습니다.');
+        }
+
+        const sourceTokenAccount = tokenAccountsData.result.value[0].pubkey;
+        console.log('소스 토큰 계정:', sourceTokenAccount);
+
+        // 수신자의 토큰 계정 조회
+        const recipientTokenAccountsResponse = await fetch('https://api.devnet.solana.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getTokenAccountsByOwner',
+            params: [
+              recipientAddress,
+              { mint: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV' },
+              { encoding: 'jsonParsed' }
+            ]
+          })
+        });
+
+        const recipientTokenAccountsData = await recipientTokenAccountsResponse.json();
+        console.log('수신자 토큰 계정 조회 결과:', recipientTokenAccountsData);
+
+        let recipientTokenAccount;
+        if (!recipientTokenAccountsData.result || !recipientTokenAccountsData.result.value || recipientTokenAccountsData.result.value.length === 0) {
+          console.log('수신자 토큰 계정이 없음. 수신자 주소를 사용합니다.');
+          recipientTokenAccount = recipientAddress;
+        } else {
+          recipientTokenAccount = recipientTokenAccountsData.result.value[0].pubkey;
+          console.log('수신자 토큰 계정:', recipientTokenAccount);
+        }
+
+        // signAndSendTransaction으로 SPL 토큰 전송
         const result = await wallet.request({
-          method: 'transfer',
+          method: 'signAndSendTransaction',
           params: {
-            to: recipientAddress,
-            amount: transferAmount,
-            token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'
+            transaction: {
+              feePayer: walletAddress,
+              instructions: [
+                {
+                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                  accounts: [
+                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: walletAddress, isSigner: true, isWritable: false }
+                  ],
+                  data: [2, 0, 0, 0, ...new Array(8).fill(0).map((_, i) => (transferAmount >> (i * 8)) & 0xFF)]
+                }
+              ]
+            }
           }
         });
         
-        console.log('팬텀 월렛 transfer 성공:', result);
+        console.log('팬텀 월렛 signAndSendTransaction 성공:', result);
         
         if (result && result.signature) {
           console.log('토큰 전송 성공:', result.signature);
@@ -124,25 +192,25 @@ function App() {
           return;
         }
       } catch (error) {
-        console.log('팬텀 월렛 transfer 실패:', error);
+        console.log('팬텀 월렛 API 실패:', error);
         
-        // 로컬 환경 문제일 수 있으므로 안내 메시지 표시
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          console.log('로컬 환경에서 Phantom Wallet API 제한이 있을 수 있습니다.');
-          alert(
-            `⚠️ 로컬 환경에서 Phantom Wallet API 제한\n\n` +
-            `현재 localhost 환경에서 Phantom Wallet의 일부 API가 제한될 수 있습니다.\n\n` +
-            `해결 방법:\n` +
-            `1. 실제 도메인에 배포하여 테스트\n` +
-            `2. Phantom Wallet에서 직접 토큰 전송\n` +
-            `3. 다른 지갑 사용\n\n` +
-            `전송 정보:\n` +
-            `• 토큰: SNAX TEST (ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV)\n` +
-            `• 수량: ${amount} SNAX TEST\n` +
-            `• 수신자: ${recipientAddress}`
-          );
-          return;
-        }
+        // API 실패 시 사용자에게 수동 전송 안내
+        alert(
+          `⚠️ 자동 토큰 전송이 지원되지 않습니다\n\n` +
+          `Phantom Wallet에서 직접 토큰을 전송해주세요:\n\n` +
+          `📋 전송 정보:\n` +
+          `• 토큰: SNAX TEST (ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV)\n` +
+          `• 수량: ${amount} SNAX TEST\n` +
+          `• 수신자: ${recipientAddress}\n\n` +
+          `📝 전송 단계:\n` +
+          `1. 팬텀 월렛 열기\n` +
+          `2. SNAX TEST 토큰 선택\n` +
+          `3. "Send" 버튼 클릭\n` +
+          `4. 수신자 주소 입력\n` +
+          `5. 전송량 입력\n` +
+          `6. 전송 승인`
+        );
+        return;
       }
 
       // Phantom Wallet에서 실제로 지원하는 간단한 방법들을 시도
