@@ -228,46 +228,107 @@ function App() {
             type: typeof transferAmount
           });
           
-          // 트랜잭션 생성 (transferAmount는 number 타입으로 전달)
-          const transaction = new Transaction().add(
-            createTransferInstruction(
-              fromTokenAccount,
-              toTokenAccount,
-              fromPubkey,
-              transferAmount
-            )
-          );
-          
-          transaction.recentBlockhash = blockhash;
-          transaction.feePayer = fromPubkey;
-          
-          // 트랜잭션 직렬화 (브라우저 호환)
-          const serializedTransaction = transaction.serialize();
-          const base64Transaction = btoa(String.fromCharCode(...serializedTransaction));
-          
-          console.log('트랜잭션 직렬화 완료, Base64 길이:', base64Transaction.length);
-          
-          // Phantom Wallet에 직렬화된 트랜잭션 전달
-          const result = await wallet.request({
-            method: 'signAndSendTransaction',
-            params: {
-              transaction: base64Transaction
+          // 더 간단한 방법으로 트랜잭션 생성 시도
+          try {
+            // 방법 1: createTransferInstruction 사용
+            console.log('방법 1: createTransferInstruction 시도');
+            const transaction = new Transaction().add(
+              createTransferInstruction(
+                fromTokenAccount,
+                toTokenAccount,
+                fromPubkey,
+                transferAmount
+              )
+            );
+            
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = fromPubkey;
+            
+            // 트랜잭션 직렬화 (브라우저 호환)
+            const serializedTransaction = transaction.serialize();
+            const base64Transaction = btoa(String.fromCharCode(...serializedTransaction));
+            
+            console.log('트랜잭션 직렬화 완료, Base64 길이:', base64Transaction.length);
+            
+            // Phantom Wallet에 직렬화된 트랜잭션 전달
+            const result = await wallet.request({
+              method: 'signAndSendTransaction',
+              params: {
+                transaction: base64Transaction
+              }
+            });
+            
+            console.log('Phantom Wallet signAndSendTransaction 성공:', result);
+            
+            if (result && result.signature) {
+              console.log('토큰 전송 성공:', result.signature);
+              alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
+              
+              // 전송 성공 후 잔액 새로고침
+              setTimeout(async () => {
+                await getSnaxBalance(walletAddress);
+              }, 3000);
+              
+              setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${result.signature}`);
+              return;
             }
-          });
-          
-          console.log('Phantom Wallet signAndSendTransaction 성공:', result);
-          
-          if (result && result.signature) {
-            console.log('토큰 전송 성공:', result.signature);
-            alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
             
-            // 전송 성공 후 잔액 새로고침
-            setTimeout(async () => {
-              await getSnaxBalance(walletAddress);
-            }, 3000);
+          } catch (createError: any) {
+            console.log('createTransferInstruction 실패:', createError);
             
-            setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${result.signature}`);
-            return;
+            // 방법 2: 수동으로 SPL 토큰 전송 명령 생성
+            console.log('방법 2: 수동 SPL 토큰 전송 명령 생성 시도');
+            
+            // SPL Token Transfer 명령 데이터 생성
+            const transferAmountBytes = Array.from(new Uint8Array(8), (_, i) => (transferAmount >> (i * 8)) & 0xFF);
+            const transferInstructionData = new Uint8Array([
+              3, // Transfer instruction discriminator
+              ...transferAmountBytes // 8-byte little-endian amount
+            ]);
+            
+            console.log('수동 전송 명령 데이터:', Array.from(transferInstructionData));
+            
+            const manualTransaction = new Transaction().add({
+              keys: [
+                { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
+                { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                { pubkey: fromPubkey, isSigner: true, isWritable: false }
+              ],
+              programId: mintPubkey, // SPL Token 프로그램 ID
+              data: transferInstructionData
+            });
+            
+            manualTransaction.recentBlockhash = blockhash;
+            manualTransaction.feePayer = fromPubkey;
+            
+            // 트랜잭션 직렬화
+            const serializedManualTransaction = manualTransaction.serialize();
+            const base64ManualTransaction = btoa(String.fromCharCode(...serializedManualTransaction));
+            
+            console.log('수동 트랜잭션 직렬화 완료, Base64 길이:', base64ManualTransaction.length);
+            
+            // Phantom Wallet에 전달
+            const manualResult = await wallet.request({
+              method: 'signAndSendTransaction',
+              params: {
+                transaction: base64ManualTransaction
+              }
+            });
+            
+            console.log('수동 트랜잭션 성공:', manualResult);
+            
+            if (manualResult && manualResult.signature) {
+              console.log('수동 토큰 전송 성공:', manualResult.signature);
+              alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${manualResult.signature}`);
+              
+              // 전송 성공 후 잔액 새로고침
+              setTimeout(async () => {
+                await getSnaxBalance(walletAddress);
+              }, 3000);
+              
+              setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${manualResult.signature}`);
+              return;
+            }
           }
           
         } catch (error: any) {
