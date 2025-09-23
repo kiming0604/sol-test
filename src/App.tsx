@@ -199,9 +199,9 @@ function App() {
           transaction.recentBlockhash = blockhash;
           transaction.feePayer = fromPubkey;
           
-          // 트랜잭션 직렬화
+          // 트랜잭션 직렬화 (브라우저 호환)
           const serializedTransaction = transaction.serialize();
-          const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
+          const base64Transaction = btoa(String.fromCharCode(...serializedTransaction));
           
           console.log('트랜잭션 직렬화 완료, Base64 길이:', base64Transaction.length);
           
