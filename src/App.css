@@ -1,38 +1,267 @@
 .App {
   text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
 }
 
 .App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3rem;
+  margin-bottom: 2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+h2 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #f0f0f0;
+}
+
+.connect-button, .disconnect-button {
+  background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+  border: none;
   color: white;
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  margin: 10px;
 }
 
-.App-link {
-  color: #61dafb;
+.connect-button:hover, .disconnect-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes App-logo-spin {
+.wallet-status {
+  margin-top: 15px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #f0f0f0;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.loading-status {
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(0, 212, 170, 0.2);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #00d4aa;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.connect-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+.disconnect-button {
+  background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+  margin-top: 20px;
+}
+
+.wallet-info {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-item {
+  margin-bottom: 20px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 15px;
+  border-radius: 10px;
+  border-left: 4px solid #ff6b6b;
+}
+
+.info-item strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  color: #f0f0f0;
+}
+
+.address, .balance, .price, .contract-address {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  border-radius: 5px;
+  margin: 0;
+}
+
+.balance {
+  color: #00d4aa;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.price {
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.price-info {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  margin-top: 5px;
+  font-style: italic;
+}
+
+.contract-address {
+  color: #74b9ff;
+  font-weight: bold;
+}
+
+.counter-section {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 20px;
+  margin: 20px 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.counter-section h3 {
+  margin-bottom: 15px;
+  color: #f0f0f0;
+  font-size: 1.3rem;
+}
+
+.counter-display {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 15px;
+  border: 2px solid #00d4aa;
+}
+
+.counter-value {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #00d4aa;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  font-family: 'Courier New', monospace;
+}
+
+.counter-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.counter-btn {
+  background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+  border: none;
+  color: white;
+  padding: 12px 20px;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  min-width: 80px;
+}
+
+.counter-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.counter-btn.increment {
+  background: linear-gradient(45deg, #00b894, #00cec9);
+}
+
+.counter-btn.decrement {
+  background: linear-gradient(45deg, #e17055, #fdcb6e);
+}
+
+.counter-btn.reset {
+  background: linear-gradient(45deg, #fd79a8, #fdcb6e);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2rem;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+  }
+  
+  .wallet-info {
+    margin: 0 20px;
+    padding: 20px;
+  }
+  
+  .connect-button, .disconnect-button {
+    padding: 12px 24px;
+    font-size: 1rem;
+  }
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(20px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
+
+.wallet-info {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.info-item {
+  animation: fadeIn 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.info-item:nth-child(1) { animation-delay: 0.1s; }
+.info-item:nth-child(2) { animation-delay: 0.2s; }
+.info-item:nth-child(3) { animation-delay: 0.3s; }
+.info-item:nth-child(4) { animation-delay: 0.4s; }
+.info-item:nth-child(5) { animation-delay: 0.5s; }
