@@ -13,7 +13,7 @@ interface PhantomWallet {
   publicKey?: { toString: () => string };
   signTransaction?: (transaction: any) => Promise<any>;
   signAllTransactions?: (transactions: any[]) => Promise<any[]>;
-  request?: (params: { method: string }) => Promise<any>;
+  request?: (params: { method: string; params?: any }) => Promise<any>;
 }
 
 // Window 객체에 Phantom Wallet 타입 추가
@@ -38,6 +38,200 @@ function App() {
   const [contractAddress, setContractAddress] = useState<string>('');
   const [counterValue, setCounterValue] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [snaxBalance, setSnaxBalance] = useState<number>(0);
+  const [transferStatus, setTransferStatus] = useState<string>('');
+
+  // SNAX 토큰 전송 함수 (팬텀 월렛이 직접 처리)
+  const sendSnaxTokens = async (amount: number, recipientAddress: string) => {
+    if (!wallet || !walletAddress) {
+      alert('지갑이 연결되어 있지 않습니다.');
+      return;
+    }
+    
+    if (amount <= 0) {
+      alert('전송할 토큰 수량을 입력해주세요.');
+      return;
+    }
+    
+    if (amount > snaxBalance) {
+      alert('보유한 SNAX 토큰보다 많은 양을 전송할 수 없습니다.');
+      return;
+    }
+    
+    if (!recipientAddress || recipientAddress.length < 32) {
+      alert('올바른 지갑 주소를 입력해주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    setTransferStatus('전송 요청 중...');
+    try {
+      console.log(`SNAX 토큰 전송 요청: ${amount} SNAX TEST -> ${recipientAddress}`);
+      
+      // 토큰 전송량을 소수점 단위로 변환 (6자리 소수점)
+      const transferAmount = Math.floor(amount * Math.pow(10, 6));
+      
+      // wallet.request가 존재하는지 확인
+      if (!wallet.request) {
+        throw new Error('팬텀 월렛의 request 메서드를 사용할 수 없습니다.');
+      }
+
+      // 팬텀 월렛에서 지원하는 메서드들을 순차적으로 시도
+      let response;
+      
+      // 먼저 팬텀 월렛이 지원하는 메서드를 확인
+      console.log('팬텀 월렛 사용 가능한 메서드:', Object.keys(wallet));
+      console.log('팬텀 월렛 request 메서드:', typeof wallet.request);
+      
+      // 간단한 방법으로 토큰 전송 시도
+      console.log('간단한 토큰 전송 시도...');
+      
+      // 팬텀 월렛에서 실제로 지원하는 메서드들을 확인해보겠습니다
+      console.log('팬텀 월렛에서 지원하는 메서드들:', Object.keys(wallet));
+      
+      // 로컬 환경에서 Phantom Wallet API 문제 확인
+      console.log('현재 환경 정보:');
+      console.log('- URL:', window.location.href);
+      console.log('- Host:', window.location.host);
+      console.log('- Protocol:', window.location.protocol);
+      console.log('- Phantom Wallet 연결 상태:', wallet.isConnected || 'unknown');
+      
+      // 팬텀 월렛의 실제 API를 사용해보겠습니다
+      try {
+        console.log('팬텀 월렛의 실제 API 시도...');
+        
+        // 팬텀 월렛에서 실제로 지원하는 방법을 시도해보겠습니다
+        const result = await wallet.request({
+          method: 'transfer',
+          params: {
+            to: recipientAddress,
+            amount: transferAmount,
+            token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'
+          }
+        });
+        
+        console.log('팬텀 월렛 transfer 성공:', result);
+        
+        if (result && result.signature) {
+          console.log('토큰 전송 성공:', result.signature);
+          alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
+          
+          // 전송 성공 후 잔액 새로고침
+          setTimeout(async () => {
+            await getSnaxBalance(walletAddress);
+          }, 3000);
+          
+          return;
+        }
+      } catch (error) {
+        console.log('팬텀 월렛 transfer 실패:', error);
+        
+        // 로컬 환경 문제일 수 있으므로 안내 메시지 표시
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.log('로컬 환경에서 Phantom Wallet API 제한이 있을 수 있습니다.');
+          alert(
+            `⚠️ 로컬 환경에서 Phantom Wallet API 제한\n\n` +
+            `현재 localhost 환경에서 Phantom Wallet의 일부 API가 제한될 수 있습니다.\n\n` +
+            `해결 방법:\n` +
+            `1. 실제 도메인에 배포하여 테스트\n` +
+            `2. Phantom Wallet에서 직접 토큰 전송\n` +
+            `3. 다른 지갑 사용\n\n` +
+            `전송 정보:\n` +
+            `• 토큰: SNAX TEST (ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV)\n` +
+            `• 수량: ${amount} SNAX TEST\n` +
+            `• 수신자: ${recipientAddress}`
+          );
+          return;
+        }
+      }
+
+      // Phantom Wallet에서 실제로 지원하는 간단한 방법들을 시도
+      const transferMethods = [
+        // 방법 1: 기본 transfer 메서드 (토큰 전송)
+        {
+          method: 'transfer',
+          params: {
+            to: recipientAddress,
+            amount: transferAmount,
+            token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'
+          }
+        },
+        // 방법 2: SOL 전송 방식으로 시도
+        {
+          method: 'transfer',
+          params: {
+            to: recipientAddress,
+            amount: transferAmount
+          }
+        }
+      ];
+
+      let lastError: any;
+      for (const transferMethod of transferMethods) {
+        try {
+          console.log(`${transferMethod.method} 시도 중...`);
+          response = await wallet.request(transferMethod);
+          console.log(`${transferMethod.method} 성공:`, response);
+          break;
+        } catch (error) {
+          console.log(`${transferMethod.method} 실패:`, error);
+          lastError = error;
+          continue;
+        }
+      }
+
+      if (!response) {
+        const errorMessage = lastError?.message || lastError?.toString() || '알 수 없는 오류';
+        throw new Error(`모든 자동 전송 방법이 실패했습니다. 마지막 에러: ${errorMessage}`);
+      }
+
+      if (response && response.signature) {
+        console.log('토큰 전송 처리 완료:', response.signature);
+        
+        if (response.manual) {
+          // 수동 전송 요청된 경우
+          console.log('수동 전송 안내 완료');
+          setTransferStatus('✅ 수동 전송 안내 완료! 팬텀 월렛에서 전송을 완료해주세요.');
+          // 수동 전송의 경우 잔액 새로고침은 사용자가 직접 해야 함
+        } else {
+          // 자동 전송 성공한 경우
+          setTransferStatus(`🚀 자동 전송 성공! 트랜잭션: ${response.signature}`);
+          alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${response.signature}`);
+          
+          // 전송 성공 후 잔액 새로고침
+          setTimeout(async () => {
+            await getSnaxBalance(walletAddress);
+          }, 3000);
+        }
+      } else {
+        throw new Error('전송 응답이 올바르지 않습니다.');
+      }
+      
+    } catch (error) {
+      console.error('SNAX 토큰 전송 실패:', error);
+      
+      let errorMessage = 'SNAX 토큰 전송에 실패했습니다.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('User rejected') || error.message.includes('rejected')) {
+          errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+        } else if (error.message.includes('insufficient funds')) {
+          errorMessage = '토큰 잔액이 부족합니다.';
+        } else if (error.message.includes('Invalid public key')) {
+          errorMessage = '올바르지 않은 지갑 주소입니다.';
+        } else if (error.message.includes('취소')) {
+          errorMessage = '사용자가 전송을 취소했습니다.';
+        } else {
+          errorMessage = `전송 실패: ${error.message}`;
+        }
+      }
+      
+      setTransferStatus(`❌ ${errorMessage}`);
+      alert(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 팬텀 월렛 연결
   const connectWallet = async () => {
@@ -48,6 +242,25 @@ function App() {
       // 팬텀 월렛 존재 여부 확인
       if (!window.solana) {
         alert('Phantom Wallet이 설치되지 않았습니다.\nChrome 웹스토어에서 설치해주세요: https://phantom.app/');
+        setIsLoading(false);
+        return;
+      }
+
+      // Devnet 설정 안내
+      const devnetGuide = `📱 팬텀 월렛을 Devnet으로 설정해주세요:
+
+1️⃣ 팬텀 월렛 열기
+2️⃣ 왼쪽 메뉴 → 설정(⚙️) 터치
+3️⃣ "개발자 설정" 터치
+4️⃣ "Testnet 모드" 활성화 (보라색으로)
+5️⃣ "Solana Devnet" 선택 확인
+
+⚠️ Testnet은 테스트용이며 실제 가치가 없습니다.
+
+설정 완료 후 "확인"을 눌러주세요.`;
+
+      const userConfirmed = window.confirm(devnetGuide);
+      if (!userConfirmed) {
         setIsLoading(false);
         return;
       }
@@ -148,6 +361,9 @@ function App() {
         // SOL 잔액 조회 시도
         const balance = await getSolBalance(response.publicKey.toString());
         
+        // SNAX 토큰 잔액 조회 시도
+        const snaxBalance = await getSnaxBalance(response.publicKey.toString());
+        
         // SOL 잔액이 있을 때만 가격 조회
         if (balance > 0) {
           console.log('SOL 잔액이 있으므로 가격 조회 시작');
@@ -189,6 +405,7 @@ function App() {
       setWallet(null);
       setWalletAddress('');
       setSolBalance(0);
+      setSnaxBalance(0);
       setIsConnected(false);
     } catch (error) {
       console.error('지갑 연결 해제 실패:', error);
@@ -255,6 +472,74 @@ function App() {
       console.error('팬텀 월렛 리셋 실패:', error);
       alert('팬텀 월렛 리셋 중 오류가 발생했습니다.');
     }
+  };
+
+  // SNAX 토큰 잔액 조회 함수
+  const getSnaxBalance = async (address: string) => {
+    console.log('SNAX 토큰 잔액 조회 시작...');
+    
+    const tokenMintAddress = 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'; // 새로 생성한 SNAX 토큰 주소
+    
+    // 테스트넷 RPC 엔드포인트들
+    const testnetEndpoints = [
+      'https://api.devnet.solana.com',
+      'https://devnet.helius-rpc.com',
+      'https://rpc.ankr.com/solana_devnet'
+    ];
+    
+    for (const endpoint of testnetEndpoints) {
+      try {
+        console.log(`SNAX 토큰 잔액 조회 시도: ${endpoint}`);
+        
+        // getTokenAccountsByOwner를 사용하여 해당 주소의 모든 토큰 계정 조회
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getTokenAccountsByOwner',
+            params: [
+              address,
+              {
+                mint: tokenMintAddress
+              },
+              {
+                encoding: 'jsonParsed'
+              }
+            ]
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.result && data.result.value && data.result.value.length > 0) {
+            const tokenAccount = data.result.value[0];
+            const amount = tokenAccount.account.data.parsed.info.tokenAmount.uiAmount;
+            console.log('SNAX 토큰 잔액 조회 성공:', amount);
+            setSnaxBalance(amount || 0);
+            return amount || 0;
+          } else {
+            console.log('SNAX 토큰 계정이 없음');
+            setSnaxBalance(0);
+            return 0;
+          }
+        }
+        
+        console.log(`${endpoint} SNAX 토큰 조회 실패: ${response.status}`);
+        
+      } catch (error) {
+        console.log(`${endpoint} SNAX 토큰 조회 오류:`, error);
+      }
+    }
+    
+    // 모든 RPC 실패 시 0으로 설정
+    console.log('모든 RPC 실패, SNAX 잔액을 0으로 설정');
+    setSnaxBalance(0);
+    return 0;
   };
 
   // SOL 잔액 조회 함수 (테스트넷 사용)
@@ -471,6 +756,7 @@ function App() {
       // 잔액 새로고침
       setTimeout(async () => {
         await getSolBalance(walletAddress);
+        await getSnaxBalance(walletAddress);
       }, 3000);
       
     } catch (error) {
@@ -489,6 +775,7 @@ function App() {
     setWallet(null);
     setWalletAddress('');
     setSolBalance(0);
+    setSnaxBalance(0);
     setIsConnected(false);
     setCounterValue(0);
     setSolPrice({ usd: 0, krw: 0 });
@@ -752,6 +1039,7 @@ function App() {
             walletAddress={walletAddress}
             solBalance={solBalance}
             solPrice={solPrice}
+            snaxBalance={snaxBalance}
             onDisconnect={disconnectWallet}
             onRequestTestSol={requestTestSol}
             onIncrement={incrementCounter}
@@ -760,6 +1048,9 @@ function App() {
             counterValue={counterValue}
             contractAddress={contractAddress}
             isLoading={isLoading}
+            onSendSnaxTokens={sendSnaxTokens}
+            onRefreshSnaxBalance={() => walletAddress && getSnaxBalance(walletAddress)}
+            transferStatus={transferStatus}
           />
         )}
       </header>
