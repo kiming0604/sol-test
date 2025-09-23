@@ -157,87 +157,93 @@ function App() {
           console.log('수신자 토큰 계정:', recipientTokenAccount);
         }
 
-        // Phantom Wallet의 다른 메서드들 시도
-        console.log('=== Phantom Wallet 다른 메서드 테스트 ===');
+        // 올바른 Phantom Wallet SPL 토큰 전송 구현
+        console.log('=== 올바른 Phantom Wallet SPL 토큰 전송 시도 ===');
         
-        // 방법 1: signAndSendTransaction 대신 다른 메서드들 시도
-        const alternativeMethods = [
-          {
-            name: '방법 1: signTransaction 후 수동 전송',
-            method: 'signTransaction',
+        try {
+          // @solana/web3.js와 @solana/spl-token 라이브러리 사용
+          const { Connection, PublicKey, Transaction, SystemProgram } = await import('@solana/web3.js');
+          const { createTransferInstruction, getAssociatedTokenAddress } = await import('@solana/spl-token');
+          
+          console.log('Solana 라이브러리 로드 성공');
+          
+          // 연결 설정
+          const connection = new Connection('https://api.devnet.solana.com');
+          
+          // 공개키 생성
+          const fromPubkey = new PublicKey(walletAddress);
+          const toPubkey = new PublicKey(recipientAddress);
+          const mintPubkey = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
+          
+          // Associated Token Account 주소 계산
+          const fromTokenAccount = await getAssociatedTokenAddress(mintPubkey, fromPubkey);
+          const toTokenAccount = await getAssociatedTokenAddress(mintPubkey, toPubkey);
+          
+          console.log('토큰 계정 주소:', { fromTokenAccount: fromTokenAccount.toString(), toTokenAccount: toTokenAccount.toString() });
+          
+          // 최신 블록해시 가져오기
+          const { blockhash } = await connection.getLatestBlockhash();
+          
+          // 트랜잭션 생성
+          const transaction = new Transaction().add(
+            createTransferInstruction(
+              fromTokenAccount,
+              toTokenAccount,
+              fromPubkey,
+              transferAmount
+            )
+          );
+          
+          transaction.recentBlockhash = blockhash;
+          transaction.feePayer = fromPubkey;
+          
+          // 트랜잭션 직렬화
+          const serializedTransaction = transaction.serialize();
+          const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
+          
+          console.log('트랜잭션 직렬화 완료, Base64 길이:', base64Transaction.length);
+          
+          // Phantom Wallet에 직렬화된 트랜잭션 전달
+          const result = await wallet.request({
+            method: 'signAndSendTransaction',
             params: {
-              transaction: {
-                feePayer: walletAddress,
-                instructions: [
-                  {
-                    programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-                    accounts: [
-                      { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
-                      { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
-                      { pubkey: walletAddress, isSigner: true, isWritable: false }
-                    ],
-                    data: btoa(String.fromCharCode(2, 0, 0, 0, ...new Array(8).fill(0).map((_, i) => (transferAmount >> (i * 8)) & 0xFF)))
-                  }
-                ]
-              }
+              transaction: base64Transaction
             }
-          },
-          {
-            name: '방법 2: 간단한 transfer 메서드',
-            method: 'transfer',
-            params: {
-              to: recipientAddress,
-              amount: amount,
-              token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'
-            }
-          },
-          {
-            name: '방법 3: SOL 전송 방식 (잘못된 방법이지만 테스트)',
-            method: 'transfer',
-            params: {
-              to: recipientAddress,
-              amount: amount
-            }
+          });
+          
+          console.log('Phantom Wallet signAndSendTransaction 성공:', result);
+          
+          if (result && result.signature) {
+            console.log('토큰 전송 성공:', result.signature);
+            alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
+            
+            // 전송 성공 후 잔액 새로고침
+            setTimeout(async () => {
+              await getSnaxBalance(walletAddress);
+            }, 3000);
+            
+            setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${result.signature}`);
+            return;
           }
-        ];
-
-        let lastError = null;
-        for (const method of alternativeMethods) {
-          try {
-            console.log(`시도 중: ${method.name}`);
-            console.log('메서드:', method.method);
-            console.log('파라미터:', method.params);
-            
-            const result = await wallet.request(method);
-            
-            console.log(`${method.name} 성공!`, result);
-            if (result && result.signature) {
-              console.log('토큰 전송 성공:', result.signature);
-              alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
-              
-              // 전송 성공 후 잔액 새로고침
-              setTimeout(async () => {
-                await getSnaxBalance(walletAddress);
-              }, 3000);
-              
-              return;
-            }
-          } catch (error: any) {
-            console.log(`${method.name} 실패:`, error);
-            console.log('에러 타입:', typeof error);
-            console.log('에러 메시지:', error?.message || 'No message');
-            console.log('에러 전체:', JSON.stringify(error, null, 2));
-            console.log('에러 스택:', error?.stack || 'No stack');
-            lastError = error;
-            continue;
+          
+        } catch (error: any) {
+          console.log('올바른 방법 실패:', error);
+          console.log('에러 타입:', typeof error);
+          console.log('에러 메시지:', error?.message || 'No message');
+          console.log('에러 전체:', JSON.stringify(error, null, 2));
+          console.log('에러 스택:', error?.stack || 'No stack');
+          
+          // Solana 라이브러리 로드 실패 시 수동 전송 안내
+          if (error?.message?.includes('Cannot resolve module') || error?.message?.includes('Dynamic import')) {
+            console.log('Solana 라이브러리 로드 실패 - 수동 전송 안내');
+          } else {
+            console.log('기타 에러 - 수동 전송 안내');
           }
         }
-
-        // 모든 방법이 실패한 경우 - 수동 전송 안내
-        console.log('모든 자동 전송 방법 실패, 수동 전송 안내');
-        console.log('마지막 에러:', lastError);
         
-        // 사용자에게 수동 전송 안내
+        // 실패 시 수동 전송 안내
+        console.log('자동 전송 실패, 수동 전송 안내');
+        
         alert(
           `⚠️ 자동 토큰 전송이 지원되지 않습니다\n\n` +
           `Phantom Wallet에서 직접 토큰을 전송해주세요:\n\n` +
