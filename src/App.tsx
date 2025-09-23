@@ -290,67 +290,7 @@ function App() {
         return;
       }
 
-      // Phantom Wallet에서 실제로 지원하는 간단한 방법들을 시도
-      const transferMethods = [
-        // 방법 1: 기본 transfer 메서드 (토큰 전송)
-        {
-          method: 'transfer',
-          params: {
-            to: recipientAddress,
-            amount: transferAmount,
-            token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'
-          }
-        },
-        // 방법 2: SOL 전송 방식으로 시도
-        {
-          method: 'transfer',
-          params: {
-            to: recipientAddress,
-            amount: transferAmount
-          }
-        }
-      ];
-
-      let lastError: any;
-      for (const transferMethod of transferMethods) {
-        try {
-          console.log(`${transferMethod.method} 시도 중...`);
-          response = await wallet.request(transferMethod);
-          console.log(`${transferMethod.method} 성공:`, response);
-          break;
-        } catch (error) {
-          console.log(`${transferMethod.method} 실패:`, error);
-          lastError = error;
-          continue;
-        }
-      }
-
-      if (!response) {
-        const errorMessage = lastError?.message || lastError?.toString() || '알 수 없는 오류';
-        throw new Error(`모든 자동 전송 방법이 실패했습니다. 마지막 에러: ${errorMessage}`);
-      }
-
-      if (response && response.signature) {
-        console.log('토큰 전송 처리 완료:', response.signature);
-        
-        if (response.manual) {
-          // 수동 전송 요청된 경우
-          console.log('수동 전송 안내 완료');
-          setTransferStatus('✅ 수동 전송 안내 완료! 팬텀 월렛에서 전송을 완료해주세요.');
-          // 수동 전송의 경우 잔액 새로고침은 사용자가 직접 해야 함
-        } else {
-          // 자동 전송 성공한 경우
-          setTransferStatus(`🚀 자동 전송 성공! 트랜잭션: ${response.signature}`);
-          alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${response.signature}`);
-          
-          // 전송 성공 후 잔액 새로고침
-          setTimeout(async () => {
-            await getSnaxBalance(walletAddress);
-          }, 3000);
-        }
-      } else {
-        throw new Error('전송 응답이 올바르지 않습니다.');
-      }
+      // 이전 코드는 새로운 트랜잭션 형태 테스트로 대체됨
       
     } catch (error) {
       console.error('SNAX 토큰 전송 실패:', error);
