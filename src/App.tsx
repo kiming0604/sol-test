@@ -223,26 +223,18 @@ function App() {
           // 최신 블록해시 가져오기
           const { blockhash } = await connection.getLatestBlockhash();
           
-          // 전송량을 8바이트 Uint8Array로 변환
-          const transferAmountBytes = new Uint8Array(8);
-          const transferAmountBigInt = BigInt(transferAmount);
-          for (let i = 0; i < 8; i++) {
-            transferAmountBytes[i] = Number((transferAmountBigInt >> BigInt(i * 8)) & BigInt(0xFF));
-          }
-          
-          console.log('전송량 변환:', {
+          console.log('전송량 정보:', {
             original: transferAmount,
-            bigInt: transferAmountBigInt.toString(),
-            bytes: Array.from(transferAmountBytes)
+            type: typeof transferAmount
           });
           
-          // 트랜잭션 생성
+          // 트랜잭션 생성 (transferAmount는 number 타입으로 전달)
           const transaction = new Transaction().add(
             createTransferInstruction(
               fromTokenAccount,
               toTokenAccount,
               fromPubkey,
-              transferAmountBytes
+              transferAmount
             )
           );
           
