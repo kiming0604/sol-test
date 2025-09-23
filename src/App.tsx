@@ -157,7 +157,7 @@ function App() {
           console.log('수신자 토큰 계정:', recipientTokenAccount);
         }
 
-        // signAndSendTransaction으로 SPL 토큰 전송
+        // signAndSendTransaction으로 SPL 토큰 전송 (더 간단한 형태)
         const result = await wallet.request({
           method: 'signAndSendTransaction',
           params: {
@@ -171,7 +171,7 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: btoa(String.fromCharCode(2, 0, 0, 0, ...new Array(8).fill(0).map((_, i) => (transferAmount >> (i * 8)) & 0xFF)))
+                  data: "AgAAAAAA" + "AAAAAAAAAAAAAAAA" // 간단한 전송 명령 (2, 0, 0, 0 + 8바이트 0)
                 }
               ]
             }
