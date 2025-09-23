@@ -162,6 +162,30 @@ function App() {
         // 올바른 Phantom Wallet SPL 토큰 전송 구현
         console.log('=== 올바른 Phantom Wallet SPL 토큰 전송 시도 ===');
         
+        // Buffer polyfill 추가 (브라우저 호환성)
+        if (typeof globalThis.Buffer === 'undefined') {
+          globalThis.Buffer = {
+            from: (data: any, encoding?: string) => {
+              if (encoding === 'base64') {
+                const binaryString = atob(data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes;
+              }
+              return new Uint8Array(data);
+            },
+            isBuffer: (obj: any) => obj instanceof Uint8Array,
+            toString: function(this: Uint8Array, encoding?: string) {
+              if (encoding === 'base64') {
+                return btoa(String.fromCharCode(...Array.from(this)));
+              }
+              return String.fromCharCode(...Array.from(this));
+            }
+          } as any;
+        }
+        
         try {
           // @solana/web3.js와 @solana/spl-token 라이브러리 동적 로드
           const { Connection, PublicKey, Transaction, SystemProgram } = await import('@solana/web3.js') as any;
