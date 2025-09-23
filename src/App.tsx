@@ -176,6 +176,19 @@ function App() {
               }
               return new Uint8Array(data);
             },
+            alloc: (size: number, fill?: number | string) => {
+              const buffer = new Uint8Array(size);
+              if (fill !== undefined) {
+                if (typeof fill === 'number') {
+                  buffer.fill(fill);
+                } else {
+                  for (let i = 0; i < size; i++) {
+                    buffer[i] = fill.charCodeAt(i % fill.length);
+                  }
+                }
+              }
+              return buffer;
+            },
             isBuffer: (obj: any) => obj instanceof Uint8Array,
             toString: function(this: Uint8Array, encoding?: string) {
               if (encoding === 'base64') {
