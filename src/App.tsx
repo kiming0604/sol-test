@@ -160,10 +160,16 @@ function App() {
         // Phantom Wallet이 기대하는 정확한 형태 찾기
         console.log('=== Phantom Wallet 트랜잭션 형태 테스트 ===');
         
+        // 실제 전송량을 포함한 올바른 트랜잭션 데이터 생성
+        const transferAmountBytes = new Array(8).fill(0);
+        for (let i = 0; i < 8; i++) {
+          transferAmountBytes[i] = (transferAmount >> (i * 8)) & 0xFF;
+        }
+        
         // 여러 다른 형태로 시도
         const transactionFormats = [
           {
-            name: '형태 1: 간단한 Base64',
+            name: '형태 1: 실제 전송량 포함 Base64',
             transaction: {
               feePayer: walletAddress,
               instructions: [
@@ -174,13 +180,13 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: "AgAAAAAA" + "AAAAAAAAAAAAAAAA"
+                  data: btoa(String.fromCharCode(2, 0, 0, 0, ...transferAmountBytes))
                 }
               ]
             }
           },
           {
-            name: '형태 2: Uint8Array',
+            name: '형태 2: 실제 전송량 포함 Uint8Array',
             transaction: {
               feePayer: walletAddress,
               instructions: [
@@ -191,13 +197,13 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                  data: new Uint8Array([2, 0, 0, 0, ...transferAmountBytes])
                 }
               ]
             }
           },
           {
-            name: '형태 3: 바이트 배열',
+            name: '형태 3: 실제 전송량 포함 바이트 배열',
             transaction: {
               feePayer: walletAddress,
               instructions: [
@@ -208,13 +214,13 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                  data: [2, 0, 0, 0, ...transferAmountBytes]
                 }
               ]
             }
           },
           {
-            name: '형태 4: 헥스 문자열',
+            name: '형태 4: 간단한 전송 (transferAmount = 0)',
             transaction: {
               feePayer: walletAddress,
               instructions: [
@@ -225,7 +231,24 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: "02000000000000000000000000000000"
+                  data: btoa(String.fromCharCode(2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+                }
+              ]
+            }
+          },
+          {
+            name: '형태 5: Phantom Wallet 표준 형식',
+            transaction: {
+              feePayer: walletAddress,
+              instructions: [
+                {
+                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                  accounts: [
+                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: walletAddress, isSigner: true, isWritable: false }
+                  ],
+                  data: "AgAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAABAAEDAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 }
               ]
             }
@@ -260,6 +283,10 @@ function App() {
             }
           } catch (error) {
             console.log(`${format.name} 실패:`, error);
+            console.log('에러 타입:', typeof error);
+            console.log('에러 메시지:', error?.message || 'No message');
+            console.log('에러 전체:', JSON.stringify(error, null, 2));
+            console.log('에러 스택:', error?.stack || 'No stack');
             lastError = error;
             continue;
           }
