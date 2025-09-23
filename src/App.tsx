@@ -171,7 +171,7 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: [2, 0, 0, 0, ...new Array(8).fill(0).map((_, i) => (transferAmount >> (i * 8)) & 0xFF)]
+                  data: btoa(String.fromCharCode(2, 0, 0, 0, ...new Array(8).fill(0).map((_, i) => (transferAmount >> (i * 8)) & 0xFF)))
                 }
               ]
             }
