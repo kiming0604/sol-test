@@ -157,119 +157,60 @@ function App() {
           console.log('수신자 토큰 계정:', recipientTokenAccount);
         }
 
-        // Phantom Wallet이 기대하는 정확한 형태 찾기
-        console.log('=== Phantom Wallet 트랜잭션 형태 테스트 ===');
+        // Phantom Wallet의 다른 메서드들 시도
+        console.log('=== Phantom Wallet 다른 메서드 테스트 ===');
         
-        // 실제 전송량을 포함한 올바른 트랜잭션 데이터 생성
-        const transferAmountBytes = new Array(8).fill(0);
-        for (let i = 0; i < 8; i++) {
-          transferAmountBytes[i] = (transferAmount >> (i * 8)) & 0xFF;
-        }
-        
-        // 여러 다른 형태로 시도
-        const transactionFormats = [
+        // 방법 1: signAndSendTransaction 대신 다른 메서드들 시도
+        const alternativeMethods = [
           {
-            name: '형태 1: 실제 전송량 포함 Base64',
-            transaction: {
-              feePayer: walletAddress,
-              instructions: [
-                {
-                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-                  accounts: [
-                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: walletAddress, isSigner: true, isWritable: false }
-                  ],
-                  data: btoa(String.fromCharCode(2, 0, 0, 0, ...transferAmountBytes))
-                }
-              ]
+            name: '방법 1: signTransaction 후 수동 전송',
+            method: 'signTransaction',
+            params: {
+              transaction: {
+                feePayer: walletAddress,
+                instructions: [
+                  {
+                    programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                    accounts: [
+                      { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+                      { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
+                      { pubkey: walletAddress, isSigner: true, isWritable: false }
+                    ],
+                    data: btoa(String.fromCharCode(2, 0, 0, 0, ...new Array(8).fill(0).map((_, i) => (transferAmount >> (i * 8)) & 0xFF)))
+                  }
+                ]
+              }
             }
           },
           {
-            name: '형태 2: 실제 전송량 포함 Uint8Array',
-            transaction: {
-              feePayer: walletAddress,
-              instructions: [
-                {
-                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-                  accounts: [
-                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: walletAddress, isSigner: true, isWritable: false }
-                  ],
-                  data: new Uint8Array([2, 0, 0, 0, ...transferAmountBytes])
-                }
-              ]
+            name: '방법 2: 간단한 transfer 메서드',
+            method: 'transfer',
+            params: {
+              to: recipientAddress,
+              amount: amount,
+              token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'
             }
           },
           {
-            name: '형태 3: 실제 전송량 포함 바이트 배열',
-            transaction: {
-              feePayer: walletAddress,
-              instructions: [
-                {
-                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-                  accounts: [
-                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: walletAddress, isSigner: true, isWritable: false }
-                  ],
-                  data: [2, 0, 0, 0, ...transferAmountBytes]
-                }
-              ]
-            }
-          },
-          {
-            name: '형태 4: 간단한 전송 (transferAmount = 0)',
-            transaction: {
-              feePayer: walletAddress,
-              instructions: [
-                {
-                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-                  accounts: [
-                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: walletAddress, isSigner: true, isWritable: false }
-                  ],
-                  data: btoa(String.fromCharCode(2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-                }
-              ]
-            }
-          },
-          {
-            name: '형태 5: Phantom Wallet 표준 형식',
-            transaction: {
-              feePayer: walletAddress,
-              instructions: [
-                {
-                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-                  accounts: [
-                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: walletAddress, isSigner: true, isWritable: false }
-                  ],
-                  data: "AgAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAABAAEDAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                }
-              ]
+            name: '방법 3: SOL 전송 방식 (잘못된 방법이지만 테스트)',
+            method: 'transfer',
+            params: {
+              to: recipientAddress,
+              amount: amount
             }
           }
         ];
 
         let lastError = null;
-        for (const format of transactionFormats) {
+        for (const method of alternativeMethods) {
           try {
-            console.log(`시도 중: ${format.name}`);
-            console.log('트랜잭션 데이터 타입:', typeof format.transaction.instructions[0].data);
-            console.log('트랜잭션 데이터:', format.transaction.instructions[0].data);
+            console.log(`시도 중: ${method.name}`);
+            console.log('메서드:', method.method);
+            console.log('파라미터:', method.params);
             
-            const result = await wallet.request({
-              method: 'signAndSendTransaction',
-              params: {
-                transaction: format.transaction
-              }
-            });
+            const result = await wallet.request(method);
             
-            console.log(`${format.name} 성공!`, result);
+            console.log(`${method.name} 성공!`, result);
             if (result && result.signature) {
               console.log('토큰 전송 성공:', result.signature);
               alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
@@ -282,7 +223,7 @@ function App() {
               return;
             }
           } catch (error: any) {
-            console.log(`${format.name} 실패:`, error);
+            console.log(`${method.name} 실패:`, error);
             console.log('에러 타입:', typeof error);
             console.log('에러 메시지:', error?.message || 'No message');
             console.log('에러 전체:', JSON.stringify(error, null, 2));
@@ -292,9 +233,30 @@ function App() {
           }
         }
 
-        // 모든 형태가 실패한 경우
-        console.log('모든 트랜잭션 형태 실패, 마지막 에러:', lastError);
-        throw lastError || new Error('모든 트랜잭션 형태가 실패했습니다.');
+        // 모든 방법이 실패한 경우 - 수동 전송 안내
+        console.log('모든 자동 전송 방법 실패, 수동 전송 안내');
+        console.log('마지막 에러:', lastError);
+        
+        // 사용자에게 수동 전송 안내
+        alert(
+          `⚠️ 자동 토큰 전송이 지원되지 않습니다\n\n` +
+          `Phantom Wallet에서 직접 토큰을 전송해주세요:\n\n` +
+          `📋 전송 정보:\n` +
+          `• 토큰: SNAX TEST\n` +
+          `• (ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV)\n` +
+          `• 수량: ${amount} SNAX TEST\n` +
+          `• 수신자: ${recipientAddress}\n\n` +
+          `📝 전송 단계:\n` +
+          `1. 팬텀 월렛 열기\n` +
+          `2. SNAX TEST 토큰 선택\n` +
+          `3. "Send" 버튼 클릭\n` +
+          `4. 수신자 주소 입력\n` +
+          `5. 전송량 입력\n` +
+          `6. 전송 승인`
+        );
+        
+        setTransferStatus('✅ 수동 전송 안내 완료! 팬텀 월렛에서 전송을 완료해주세요.');
+        return;
       } catch (error) {
         console.log('팬텀 월렛 API 실패:', error);
         
