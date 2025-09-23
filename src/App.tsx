@@ -157,10 +157,13 @@ function App() {
           console.log('수신자 토큰 계정:', recipientTokenAccount);
         }
 
-        // signAndSendTransaction으로 SPL 토큰 전송 (더 간단한 형태)
-        const result = await wallet.request({
-          method: 'signAndSendTransaction',
-          params: {
+        // Phantom Wallet이 기대하는 정확한 형태 찾기
+        console.log('=== Phantom Wallet 트랜잭션 형태 테스트 ===');
+        
+        // 여러 다른 형태로 시도
+        const transactionFormats = [
+          {
+            name: '형태 1: 간단한 Base64',
             transaction: {
               feePayer: walletAddress,
               instructions: [
@@ -171,26 +174,100 @@ function App() {
                     { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
                     { pubkey: walletAddress, isSigner: true, isWritable: false }
                   ],
-                  data: "AgAAAAAA" + "AAAAAAAAAAAAAAAA" // 간단한 전송 명령 (2, 0, 0, 0 + 8바이트 0)
+                  data: "AgAAAAAA" + "AAAAAAAAAAAAAAAA"
+                }
+              ]
+            }
+          },
+          {
+            name: '형태 2: Uint8Array',
+            transaction: {
+              feePayer: walletAddress,
+              instructions: [
+                {
+                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                  accounts: [
+                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: walletAddress, isSigner: true, isWritable: false }
+                  ],
+                  data: new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                }
+              ]
+            }
+          },
+          {
+            name: '형태 3: 바이트 배열',
+            transaction: {
+              feePayer: walletAddress,
+              instructions: [
+                {
+                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                  accounts: [
+                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: walletAddress, isSigner: true, isWritable: false }
+                  ],
+                  data: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                }
+              ]
+            }
+          },
+          {
+            name: '형태 4: 헥스 문자열',
+            transaction: {
+              feePayer: walletAddress,
+              instructions: [
+                {
+                  programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                  accounts: [
+                    { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: recipientTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: walletAddress, isSigner: true, isWritable: false }
+                  ],
+                  data: "02000000000000000000000000000000"
                 }
               ]
             }
           }
-        });
-        
-        console.log('팬텀 월렛 signAndSendTransaction 성공:', result);
-        
-        if (result && result.signature) {
-          console.log('토큰 전송 성공:', result.signature);
-          alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
-          
-          // 전송 성공 후 잔액 새로고침
-          setTimeout(async () => {
-            await getSnaxBalance(walletAddress);
-          }, 3000);
-          
-          return;
+        ];
+
+        let lastError = null;
+        for (const format of transactionFormats) {
+          try {
+            console.log(`시도 중: ${format.name}`);
+            console.log('트랜잭션 데이터 타입:', typeof format.transaction.instructions[0].data);
+            console.log('트랜잭션 데이터:', format.transaction.instructions[0].data);
+            
+            const result = await wallet.request({
+              method: 'signAndSendTransaction',
+              params: {
+                transaction: format.transaction
+              }
+            });
+            
+            console.log(`${format.name} 성공!`, result);
+            if (result && result.signature) {
+              console.log('토큰 전송 성공:', result.signature);
+              alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
+              
+              // 전송 성공 후 잔액 새로고침
+              setTimeout(async () => {
+                await getSnaxBalance(walletAddress);
+              }, 3000);
+              
+              return;
+            }
+          } catch (error) {
+            console.log(`${format.name} 실패:`, error);
+            lastError = error;
+            continue;
+          }
         }
+
+        // 모든 형태가 실패한 경우
+        console.log('모든 트랜잭션 형태 실패, 마지막 에러:', lastError);
+        throw lastError || new Error('모든 트랜잭션 형태가 실패했습니다.');
       } catch (error) {
         console.log('팬텀 월렛 API 실패:', error);
         
