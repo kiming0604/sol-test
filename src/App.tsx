@@ -110,7 +110,7 @@ function App() {
       
       console.log('받는 사람 토큰 계정:', recipientTokenAddress.toString());
       
-      // 트랜잭션 생성
+      // 트랜잭션 생성 (간단한 방식)
       const transaction = new Transaction().add(
         createTransferInstruction(
           senderTokenAddress,
@@ -150,21 +150,27 @@ function App() {
       
     } catch (error: any) {
       console.error('SNAX 토큰 전송 실패:', error);
+      console.error('에러 타입:', typeof error);
+      console.error('에러 메시지:', error?.message || 'No message');
+      console.error('에러 전체:', JSON.stringify(error, null, 2));
+      console.error('에러 스택:', error?.stack || 'No stack');
       
       let errorMessage = 'SNAX 토큰 전송에 실패했습니다.';
       
-      if (error.message.includes('User rejected') || error.message.includes('rejected')) {
+      if (error.message?.includes('User rejected') || error.message?.includes('rejected')) {
         errorMessage = '사용자가 트랜잭션을 거부했습니다.';
-      } else if (error.message.includes('insufficient funds')) {
+      } else if (error.message?.includes('insufficient funds')) {
         errorMessage = '토큰 잔액이 부족합니다.';
-      } else if (error.message.includes('Invalid public key')) {
+      } else if (error.message?.includes('Invalid public key')) {
         errorMessage = '올바르지 않은 지갑 주소입니다.';
+      } else if (error.message?.includes('Unexpected error')) {
+        errorMessage = '예상치 못한 에러가 발생했습니다. 네트워크 상태를 확인해주세요.';
       } else {
-        errorMessage = `전송 실패: ${error.message}`;
+        errorMessage = `전송 실패: ${error.message || '알 수 없는 에러'}`;
       }
       
       setTransferStatus(`❌ ${errorMessage}`);
-      alert(errorMessage);
+      alert(`${errorMessage}\n\n에러 상세: ${JSON.stringify(error, null, 2)}`);
     } finally {
       setIsLoading(false);
     }
