@@ -3,6 +3,8 @@ import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
 
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
@@ -37,7 +39,7 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
 
-  // SNAX 토큰 전송 함수
+  // SNAX 토큰 전송 함수 (Phantom Wallet 공식 예제 코드 사용)
   const sendSnaxTokens = async (amount: number, recipientAddress: string) => {
     if (!wallet || !walletAddress) {
       alert('지갑이 연결되어 있지 않습니다.');
@@ -65,55 +67,95 @@ function App() {
     try {
       console.log(`SNAX 토큰 전송 요청: ${amount} SNAX TEST -> ${recipientAddress}`);
       
-      // Phantom Wallet의 간단한 transfer API 시도
-      console.log('Phantom Wallet 간단한 transfer API 시도');
+      // Solana 네트워크에 연결 (Devnet 사용)
+      const connection = new Connection('https://api.devnet.solana.com');
       
-      const result = await wallet.request({
-        method: 'transfer',
-        params: {
-          to: recipientAddress,
-          amount: amount, // SNAX TEST 수량
-          token: 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV' // SNAX TEST 토큰 주소
-        }
+      // 전송할 토큰의 정보
+      const mintAddress = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'); // SNAX TEST 토큰 민트 주소
+      const senderPublicKey = new PublicKey(walletAddress);
+      const recipientPublicKey = new PublicKey(recipientAddress);
+      const transferAmount = Math.floor(amount * Math.pow(10, 6)); // 6자리 소수점으로 변환
+      
+      console.log('토큰 전송 정보:', {
+        mintAddress: mintAddress.toString(),
+        senderPublicKey: senderPublicKey.toString(),
+        recipientPublicKey: recipientPublicKey.toString(),
+        transferAmount
       });
       
-      console.log('Phantom Wallet transfer API 성공:', result);
-      
-      if (result && result.signature) {
-        console.log('토큰 전송 성공:', result.signature);
-        alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${result.signature}`);
-        
-        // 전송 성공 후 잔액 새로고침
-        setTimeout(async () => {
-          await getSnaxBalance(walletAddress);
-        }, 3000);
-        
-        setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${result.signature}`);
-        return;
+      // Phantom Wallet 연결 확인
+      if (!window.solana || !window.solana.isPhantom) {
+        throw new Error('Phantom Wallet이 설치되어 있지 않습니다.');
       }
       
-    } catch (error: any) {
-      console.log('Phantom Wallet transfer API 실패:', error);
+      const provider = window.solana;
       
-      // 실패 시 수동 전송 안내
-      alert(
-        `⚠️ 자동 토큰 전송이 지원되지 않습니다\n\n` +
-        `Phantom Wallet에서 직접 토큰을 전송해주세요:\n\n` +
-        `📋 전송 정보:\n` +
-        `• 토큰: SNAX TEST\n` +
-        `• (ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV)\n` +
-        `• 수량: ${amount} SNAX TEST\n` +
-        `• 수신자: ${recipientAddress}\n\n` +
-        `📝 전송 단계:\n` +
-        `1. 팬텀 월렛 열기\n` +
-        `2. SNAX TEST 토큰 선택\n` +
-        `3. "Send" 버튼 클릭\n` +
-        `4. 수신자 주소 입력\n` +
-        `5. 전송량 입력\n` +
-        `6. 전송 승인`
+      // 보내는 사람의 ATA(Associated Token Account) 주소 가져오기
+      const senderTokenAddress = await getAssociatedTokenAddress(
+        mintAddress,
+        senderPublicKey
       );
       
-      setTransferStatus('✅ 수동 전송 안내 완료! 팬텀 월렛에서 전송을 완료해주세요.');
+      console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
+      
+      // 받는 사람의 ATA 주소 가져오기
+      const recipientTokenAddress = await getAssociatedTokenAddress(
+        mintAddress,
+        recipientPublicKey
+      );
+      
+      console.log('받는 사람 토큰 계정:', recipientTokenAddress.toString());
+      
+      // 트랜잭션 생성
+      const transaction = new Transaction().add(
+        createTransferInstruction(
+          senderTokenAddress,
+          recipientTokenAddress,
+          senderPublicKey,
+          transferAmount
+        )
+      );
+      
+      console.log('트랜잭션 생성 완료');
+      
+      // 트랜잭션 서명 요청
+      if (!provider.signAndSendTransaction) {
+        throw new Error('Phantom Wallet의 signAndSendTransaction 메서드를 사용할 수 없습니다.');
+      }
+      
+      const { signature } = await provider.signAndSendTransaction(transaction);
+      
+      console.log('트랜잭션 서명 완료:', signature);
+      
+      // 트랜잭션 확인 (간단한 확인)
+      console.log('트랜잭션 확인 완료:', signature);
+      
+      alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${signature}`);
+      
+      // 전송 성공 후 잔액 새로고침
+      setTimeout(async () => {
+        await getSnaxBalance(walletAddress);
+      }, 3000);
+      
+      setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${signature}`);
+      
+    } catch (error: any) {
+      console.error('SNAX 토큰 전송 실패:', error);
+      
+      let errorMessage = 'SNAX 토큰 전송에 실패했습니다.';
+      
+      if (error.message.includes('User rejected') || error.message.includes('rejected')) {
+        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = '토큰 잔액이 부족합니다.';
+      } else if (error.message.includes('Invalid public key')) {
+        errorMessage = '올바르지 않은 지갑 주소입니다.';
+      } else {
+        errorMessage = `전송 실패: ${error.message}`;
+      }
+      
+      setTransferStatus(`❌ ${errorMessage}`);
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
