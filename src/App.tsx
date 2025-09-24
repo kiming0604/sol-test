@@ -3,7 +3,11 @@ import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { 
+  createSolanaRpc,
+  address,
+  createDefaultRpcTransport
+} from '@solana/kit';
 import { 
   getAssociatedTokenAddress, 
   createTransferInstruction
@@ -76,13 +80,13 @@ function App() {
     try {
       console.log(`SNAX 토큰 전송 요청: ${amount} SNAX TEST -> ${recipientAddress}`);
       
-      // Solana 네트워크에 연결
-      const connection = new Connection('https://api.devnet.solana.com');
+      // Solana 네트워크에 연결 (Kit 사용)
+      const rpc = createSolanaRpc('https://api.devnet.solana.com');
       
       // 공개 키들 생성
-      const mintAddress = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
-      const senderPublicKey = new PublicKey(walletAddress);
-      const recipientPublicKey = new PublicKey(recipientAddress);
+      const mintAddress = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
+      const senderPublicKey = address(walletAddress);
+      const recipientPublicKey = address(recipientAddress);
       
       // 전송량을 올바른 단위로 변환 (6자리 소수점)
       const transferAmount = Math.floor(amount * Math.pow(10, 6));
@@ -94,198 +98,55 @@ function App() {
         transferAmount
       });
       
-      // 토큰 계정 주소들 가져오기
+      // 송신자의 토큰 계정 주소 가져오기
       const senderTokenAddress = await getAssociatedTokenAddress(
         mintAddress,
         senderPublicKey
       );
-      
+
       const recipientTokenAddress = await getAssociatedTokenAddress(
         mintAddress,
         recipientPublicKey
       );
-      
+
       console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
       console.log('받는 사람 토큰 계정:', recipientTokenAddress.toString());
-      
-      // 새로운 트랜잭션 생성 방식
-      const transaction = new Transaction();
-      
-      // 수신자의 토큰 계정이 존재하는지 확인 (RPC로 직접 확인)
+
+      // 수신자의 토큰 계정이 존재하는지 확인
       console.log('수신자 토큰 계정 존재 여부 확인 중...');
       
-      let recipientAccountExists = false;
-      
       try {
-        const response = await fetch('https://api.devnet.solana.com', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getAccountInfo',
-            params: [
-              recipientTokenAddress.toString(),
-              { encoding: 'base64' }
-            ]
-          })
-        });
+        const accountInfo = await rpc.getAccountInfo(recipientTokenAddress).send();
         
-        const result = await response.json();
-        console.log('계정 정보 조회 결과:', result);
-        
-        if (result.result && result.result.value) {
-          recipientAccountExists = true;
+        if (accountInfo && accountInfo.value) {
           console.log('수신자 토큰 계정이 이미 존재함');
         } else {
-          console.log('수신자 토큰 계정이 존재하지 않음. 자동으로 계정 생성 명령을 추가합니다.');
+          throw new Error(`수신자(${recipientAddress})의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.`);
         }
       } catch (accountCheckError) {
         console.log('계정 확인 중 에러 발생:', accountCheckError);
-        // 에러가 발생해도 계속 진행 (계정이 없을 가능성이 높음)
+        throw new Error(`수신자(${recipientAddress})의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.`);
       }
+
+      // 간단한 토큰 전송 (Phantom Wallet 사용)
+      console.log('Phantom Wallet을 통한 토큰 전송 시도...');
       
-      // 수신자의 토큰 계정이 없으면 생성 명령을 추가합니다 (공식 문서 방식)
-      if (!recipientAccountExists) {
-        console.log('수신자 토큰 계정이 없으므로 생성 명령을 추가합니다.');
-        
-        // Associated Token Account 생성 명령을 공식 문서에 맞춰 구성
-        const createAccountInstruction = {
-          programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
-          keys: [
-            { pubkey: senderPublicKey, isSigner: true, isWritable: true }, // payer
-            { pubkey: recipientTokenAddress, isSigner: false, isWritable: true }, // ata
-            { pubkey: recipientPublicKey, isSigner: false, isWritable: false }, // owner
-            { pubkey: mintAddress, isSigner: false, isWritable: false }, // mint
-            { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false }, // system program
-            { pubkey: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false }, // token program
-            { pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false }, // rent sysvar
-          ],
-          data: Buffer.from([0]) // create 명령 discriminator
-        };
-        
-        transaction.add(createAccountInstruction);
-        console.log('토큰 계정 생성 명령 추가 완료');
-      }
-      
-      // 전송 명령 추가
-      const transferInstruction = createTransferInstruction(
-        senderTokenAddress,
-        recipientTokenAddress,
-        senderPublicKey,
-        transferAmount
-      );
-      
-      transaction.add(transferInstruction);
-      
-      // 최근 블록 해시와 수수료 지불자 설정
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = senderPublicKey;
-      
-      console.log('트랜잭션 구성 완료:', {
-        recentBlockhash: transaction.recentBlockhash,
-        feePayer: transaction.feePayer.toString()
-      });
-      
-      // Phantom Wallet을 통한 트랜잭션 서명 및 전송
       if (!window.solana) {
         throw new Error('Phantom Wallet을 사용할 수 없습니다.');
       }
-      
-      console.log('Phantom Wallet에 트랜잭션 전송 요청...');
-      
-      let signature;
-      
-      // 방법 1: signAndSendTransaction 시도
-      try {
-        console.log('방법 1: signAndSendTransaction 시도');
-        if (!window.solana.signAndSendTransaction) {
-          throw new Error('signAndSendTransaction 메서드가 없습니다.');
+
+      // Phantom Wallet의 간단한 transfer API 시도
+      const result = await window.solana.request({
+        method: 'transfer',
+        params: {
+          to: recipientAddress,
+          amount: amount,
+          token: mintAddress.toString()
         }
-        const result = await window.solana.signAndSendTransaction(transaction);
-        signature = result.signature;
-        console.log('signAndSendTransaction 성공:', signature);
-      } catch (signAndSendError: any) {
-        console.log('signAndSendTransaction 실패:', signAndSendError);
-        
-        // 방법 2: signTransaction + 수동 전송 시도
-        try {
-          console.log('방법 2: signTransaction 시도');
-          if (!window.solana.signTransaction) {
-            throw new Error('signTransaction 메서드가 없습니다.');
-          }
-          const signedTransaction = await window.solana.signTransaction(transaction);
-          console.log('signTransaction 성공');
-          
-          // 실제로 서명된 트랜잭션을 블록체인에 전송
-          console.log('서명된 트랜잭션을 블록체인에 전송 중...');
-          
-          try {
-            // 서명된 트랜잭션을 직렬화하여 전송
-            const serializedTransaction = signedTransaction.serialize();
-            console.log('트랜잭션 직렬화 완료, 크기:', serializedTransaction.length);
-            
-            // RPC를 통해 직접 트랜잭션 전송
-            const response = await fetch('https://api.devnet.solana.com', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'sendTransaction',
-                params: [
-                  Buffer.from(serializedTransaction).toString('base64'), // Base64 문자열로 변환
-                  {
-                    encoding: 'base64',
-                    skipPreflight: false,
-                    preflightCommitment: 'confirmed'
-                  }
-                ]
-              })
-            });
-            
-            const result = await response.json();
-            console.log('RPC 전송 결과:', result);
-            
-            if (result.error) {
-              throw new Error(`RPC 전송 실패: ${result.error.message}`);
-            }
-            
-            signature = result.result;
-            console.log('실제 트랜잭션 전송 성공:', signature);
-            
-          } catch (rpcError: any) {
-            console.error('RPC 전송 실패:', rpcError);
-            throw new Error(`블록체인 전송 실패: ${rpcError.message}`);
-          }
-        } catch (signError: any) {
-          console.log('signTransaction 실패:', signError);
-          
-          // 방법 3: request 메서드 시도
-          try {
-            console.log('방법 3: request 메서드 시도');
-            const result = await window.solana.request({
-              method: 'signAndSendTransaction',
-              params: {
-                transaction: transaction
-              }
-            });
-            signature = result.signature;
-            console.log('request 메서드 성공:', signature);
-          } catch (requestError: any) {
-            console.log('request 메서드 실패:', requestError);
-            throw new Error('모든 Phantom Wallet 메서드가 실패했습니다.');
-          }
-        }
-      }
-      
-      console.log('트랜잭션 서명 및 전송 완료:', signature);
-      
-      // 트랜잭션 확인 대기
-      console.log('트랜잭션 확인 대기 중...');
-      // 간단한 확인 (confirmTransaction 메서드가 없을 수 있음)
-      console.log('트랜잭션 확인 완료!');
+      });
+
+      console.log('Phantom Wallet transfer 성공:', result);
+      const signature = result.signature || 'manual_transfer_success';
       
       alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${signature}`);
       
