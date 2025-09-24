@@ -140,10 +140,30 @@ function App() {
         // 에러가 발생해도 계속 진행 (계정이 없을 가능성이 높음)
       }
       
-      // 토큰 계정이 없으면 생성 명령 추가 (간단한 방식)
+      // 토큰 계정이 없으면 생성 명령 추가 (수동 구현)
       if (!recipientAccountExists) {
-        console.log('토큰 계정이 없지만 전송을 시도합니다. Solana가 자동으로 처리할 수 있습니다.');
-        // 실제로는 Solana의 createTransferInstruction이 자동으로 계정을 생성할 수 있습니다
+        console.log('토큰 계정 생성 명령을 트랜잭션에 추가합니다.');
+        try {
+          // Associated Token Account 생성 명령을 수동으로 구성
+          const createAccountInstruction = {
+            programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
+            keys: [
+              { pubkey: senderPublicKey, isSigner: true, isWritable: true }, // payer
+              { pubkey: recipientTokenAddress, isSigner: false, isWritable: true }, // ata
+              { pubkey: recipientPublicKey, isSigner: false, isWritable: false }, // owner
+              { pubkey: mintAddress, isSigner: false, isWritable: false }, // mint
+              { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false }, // system program
+              { pubkey: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false }, // token program
+            ],
+            data: Buffer.from([]) // 빈 데이터
+          };
+          
+          transaction.add(createAccountInstruction);
+          console.log('토큰 계정 생성 명령 추가 완료');
+        } catch (createError) {
+          console.error('토큰 계정 생성 명령 추가 실패:', createError);
+          // 생성 명령 추가에 실패해도 전송은 시도해봅니다
+        }
       }
       
       // 전송 명령 추가
