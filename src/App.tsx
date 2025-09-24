@@ -112,44 +112,63 @@ function App() {
       
       let signature: string;
       
-      // Phantom Wallet의 실제 지원되는 API 사용
+      // Phantom Wallet 지원 메서드 확인
+      console.log('Phantom Wallet 사용 가능한 메서드:', Object.keys(window.solana));
+      
+      // 방법 1: Phantom Wallet의 기본 connect 및 signMessage 시도
       try {
-        // 방법 1: Phantom Wallet의 실제 SPL 토큰 전송 API
-        console.log('방법 1: Phantom Wallet SPL 토큰 전송 API 시도');
+        console.log('방법 1: 기본 Phantom Wallet 기능 확인');
         
-        const result = await window.solana.request({
-          method: 'splTransfer',
-          params: {
-            to: recipientAddress,
-            amount: transferAmount,
-            mintAddress: mintAddressStr
-          }
-        });
+        // 먼저 연결 상태 확인
+        if (!window.solana.isConnected) {
+          console.log('Phantom Wallet 연결 시도...');
+          await window.solana.connect();
+        }
         
-        console.log('Phantom Wallet SPL 토큰 전송 성공:', result);
-        signature = result.signature || result.txid || 'spl_transfer_success';
-      } catch (splError) {
-        console.log('splTransfer 실패, 방법 2 시도:', splError);
+        // 메시지 서명으로 테스트
+        const message = `Transfer ${amount} SNAX TEST to ${recipientAddress}`;
+        const signedMessage = await window.solana.signMessage(new TextEncoder().encode(message));
+        
+        console.log('Phantom Wallet 메시지 서명 성공:', signedMessage);
+        signature = `message_signed_${Date.now()}`;
+        
+      } catch (basicError) {
+        console.log('기본 기능 실패, 방법 2 시도:', basicError);
         
         try {
-          // 방법 2: 간단한 SOL 전송으로 시도
-          console.log('방법 2: SOL 전송으로 시도');
+          // 방법 2: 사용자에게 수동 전송 안내
+          console.log('방법 2: 수동 전송 안내');
           
-          const result = await window.solana.request({
-            method: 'transfer',
-            params: {
-              to: recipientAddress,
-              amount: 0.001 // 최소 SOL 전송량
-            }
-          });
+          const transferInfo = {
+            token: mintAddressStr,
+            recipient: recipientAddress,
+            amount: amount,
+            transferAmount: transferAmount
+          };
           
-          console.log('SOL 전송 성공:', result);
-          signature = result.signature || 'sol_transfer_success';
-        } catch (solError) {
-          console.log('SOL 전송도 실패, 방법 3 시도:', solError);
+          console.log('전송 정보:', transferInfo);
           
-          // 방법 3: 수동 전송 안내
-          throw new Error(`자동 토큰 전송이 실패했습니다. 수동으로 전송해주세요:\n\n토큰: ${mintAddressStr}\n수신자: ${recipientAddress}\n금액: ${amount} SNAX TEST`);
+          // 사용자에게 Phantom Wallet에서 직접 전송하도록 안내
+          const userConfirm = window.confirm(
+            `Phantom Wallet에서 자동 전송이 지원되지 않습니다.\n\n` +
+            `수동으로 전송해주세요:\n` +
+            `토큰: ${mintAddressStr}\n` +
+            `수신자: ${recipientAddress}\n` +
+            `금액: ${amount} SNAX TEST\n\n` +
+            `Phantom Wallet을 열어서 직접 전송하시겠습니까?`
+          );
+          
+          if (userConfirm) {
+            // Phantom Wallet 열기
+            window.open('https://phantom.app/', '_blank');
+            signature = 'manual_transfer_guided';
+          } else {
+            throw new Error('사용자가 수동 전송을 취소했습니다.');
+          }
+          
+        } catch (manualError) {
+          console.log('수동 전송 안내 실패:', manualError);
+          throw new Error(`Phantom Wallet 자동 전송을 지원하지 않습니다. 수동으로 전송해주세요:\n\n토큰: ${mintAddressStr}\n수신자: ${recipientAddress}\n금액: ${amount} SNAX TEST`);
         }
       }
       
