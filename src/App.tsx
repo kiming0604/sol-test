@@ -9,12 +9,12 @@ import {
   createTransferInstruction
 } from '@solana/spl-token';
 
-// 공식 문서 방식: getOrCreateAssociatedTokenAccount와 transfer 강제 import
-const { getOrCreateAssociatedTokenAccount, transfer } = require('@solana/spl-token') as any;
-
 // Buffer polyfill for browser compatibility
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
+
+// 공식 문서 방식: getOrCreateAssociatedTokenAccount와 transfer 강제 import
+const { getOrCreateAssociatedTokenAccount, transfer } = require('@solana/spl-token') as any;
 
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
