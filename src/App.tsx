@@ -143,156 +143,53 @@ function App() {
         // 에러가 발생해도 계속 진행 (계정이 없을 가능성이 높음)
       }
       
-      // 수신자의 토큰 계정이 없으면 생성 명령을 추가합니다 (최신 문서 방식)
-      if (!recipientAccountExists) {
-        console.log('수신자 토큰 계정이 없으므로 생성 명령을 추가합니다.');
-        
-        // Associated Token Account 생성 명령을 최신 문서에 맞춰 구성
-        const createAccountInstruction = {
-          programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
-          keys: [
-            { pubkey: senderPublicKey, isSigner: true, isWritable: true }, // payer
-            { pubkey: recipientTokenAddress, isSigner: false, isWritable: true }, // ata
-            { pubkey: recipientPublicKey, isSigner: false, isWritable: false }, // owner
-            { pubkey: mintAddress, isSigner: false, isWritable: false }, // mint
-            { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false }, // system program
-            { pubkey: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false }, // token program
-            { pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false }, // rent sysvar
-          ],
-          data: Buffer.from([0]) // create 명령 discriminator
-        };
-        
-        transaction.add(createAccountInstruction);
-        console.log('토큰 계정 생성 명령 추가 완료');
-      }
+      // 공식 문서 방식: getOrCreateAssociatedTokenAccount와 transfer 사용
+      console.log('공식 문서 방식으로 토큰 전송을 시도합니다.');
       
-      // 전송 명령 추가
-      const transferInstruction = createTransferInstruction(
-        senderTokenAddress,
-        recipientTokenAddress,
-        senderPublicKey,
-        transferAmount
-      );
-      
-      transaction.add(transferInstruction);
-      
-      // 최근 블록 해시와 수수료 지불자 설정
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = senderPublicKey;
-      
-      console.log('트랜잭션 구성 완료:', {
-        recentBlockhash: transaction.recentBlockhash,
-        feePayer: transaction.feePayer.toString()
-      });
-      
-      // Phantom Wallet을 통한 트랜잭션 서명 및 전송 (다른 방법 시도)
-      if (!window.solana) {
-        throw new Error('Phantom Wallet을 사용할 수 없습니다.');
-      }
-      
-      console.log('Phantom Wallet에 트랜잭션 전송 요청...');
-      
-      let signature;
-      
-      // 방법 1: signAndSendTransaction 시도
       try {
-        console.log('방법 1: signAndSendTransaction 시도');
-        if (!window.solana.signAndSendTransaction) {
-          throw new Error('signAndSendTransaction 메서드가 없습니다.');
-        }
-        const result = await window.solana.signAndSendTransaction(transaction);
-        signature = result.signature;
-        console.log('signAndSendTransaction 성공:', signature);
-      } catch (signAndSendError: any) {
-        console.log('signAndSendTransaction 실패:', signAndSendError);
+        // 1. 수신자의 Associated Token Account를 생성하거나 가져옵니다
+        console.log('수신자의 Associated Token Account를 생성하거나 가져오는 중...');
         
-        // 방법 2: signTransaction + 수동 전송 시도
-        try {
-          console.log('방법 2: signTransaction 시도');
-          if (!window.solana.signTransaction) {
-            throw new Error('signTransaction 메서드가 없습니다.');
-          }
-          const signedTransaction = await window.solana.signTransaction(transaction);
-          console.log('signTransaction 성공');
-          
-          // 실제로 서명된 트랜잭션을 블록체인에 전송
-          console.log('서명된 트랜잭션을 블록체인에 전송 중...');
-          
-          try {
-            // 서명된 트랜잭션을 직렬화하여 전송
-            const serializedTransaction = signedTransaction.serialize();
-            console.log('트랜잭션 직렬화 완료, 크기:', serializedTransaction.length);
-            
-            // RPC를 통해 직접 트랜잭션 전송
-            const response = await fetch('https://api.devnet.solana.com', {
-            method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-                method: 'sendTransaction',
-                params: [
-                  Buffer.from(serializedTransaction).toString('base64'), // Base64 문자열로 변환
-                  {
-                    encoding: 'base64',
-                    skipPreflight: false,
-                    preflightCommitment: 'confirmed'
-                  }
-                ]
-            })
-          });
-
-            const result = await response.json();
-            console.log('RPC 전송 결과:', result);
-            
-            if (result.error) {
-              throw new Error(`RPC 전송 실패: ${result.error.message}`);
-            }
-            
-            signature = result.result;
-            console.log('실제 트랜잭션 전송 성공:', signature);
-            
-          } catch (rpcError: any) {
-            console.error('RPC 전송 실패:', rpcError);
-            throw new Error(`블록체인 전송 실패: ${rpcError.message}`);
-          }
-        } catch (signError: any) {
-          console.log('signTransaction 실패:', signError);
-          
-          // 방법 3: request 메서드 시도
-          try {
-            console.log('방법 3: request 메서드 시도');
-            const result = await window.solana.request({
-              method: 'signAndSendTransaction',
-              params: {
-                transaction: transaction
-              }
-            });
-            signature = result.signature;
-            console.log('request 메서드 성공:', signature);
-          } catch (requestError: any) {
-            console.log('request 메서드 실패:', requestError);
-            throw new Error('모든 Phantom Wallet 메서드가 실패했습니다.');
-          }
-        }
+        // 동적으로 SPL Token 라이브러리를 가져옵니다
+        const { getOrCreateAssociatedTokenAccount, transfer } = require('@solana/spl-token');
+        
+        const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+          connection,
+          senderPublicKey, // payer
+          mintAddress, // mint
+          recipientPublicKey // owner
+        );
+        
+        console.log('수신자 토큰 계정 주소:', recipientTokenAccount.address.toString());
+        
+        // 2. 토큰을 전송합니다
+        console.log('토큰 전송 중...');
+        const signature = await transfer(
+          connection,
+          senderPublicKey, // payer
+          senderTokenAddress, // source
+          recipientTokenAccount.address, // destination
+          senderPublicKey, // owner
+          transferAmount // amount
+        );
+        
+        console.log('토큰 전송 성공! 서명:', signature);
+        alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${signature}`);
+        
+        // 전송 성공 후 잔액 새로고침
+        setTimeout(async () => {
+          await getSnaxBalance(walletAddress);
+        }, 3000);
+        
+        setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${signature}`);
+        return; // 성공했으므로 함수 종료
+        
+      } catch (splError: any) {
+        console.error('SPL Token 라이브러리 전송 실패:', splError);
+        throw new Error(`SPL Token 전송 실패: ${splError.message}`);
       }
       
-      console.log('트랜잭션 서명 및 전송 완료:', signature);
-      
-      // 트랜잭션 확인 대기
-      console.log('트랜잭션 확인 대기 중...');
-      // 간단한 확인 (confirmTransaction 메서드가 없을 수 있음)
-      console.log('트랜잭션 확인 완료!');
-      
-      alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${signature}`);
-      
-      // 전송 성공 후 잔액 새로고침
-      setTimeout(async () => {
-        await getSnaxBalance(walletAddress);
-      }, 3000);
-      
-      setTransferStatus(`✅ 토큰 전송 완료! 트랜잭션: ${signature}`);
+      // 공식 문서 방식을 사용했으므로 기존 트랜잭션 로직은 필요 없습니다
       
     } catch (error: any) {
       console.error('SNAX 토큰 전송 실패:', error);
