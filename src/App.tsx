@@ -9,6 +9,9 @@ import {
   createTransferInstruction
 } from '@solana/spl-token';
 
+// 공식 문서 방식: getOrCreateAssociatedTokenAccount와 transfer 강제 import
+const { getOrCreateAssociatedTokenAccount, transfer } = require('@solana/spl-token') as any;
+
 // Buffer polyfill for browser compatibility
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
@@ -150,8 +153,8 @@ function App() {
         // 1. 수신자의 Associated Token Account를 생성하거나 가져옵니다
         console.log('수신자의 Associated Token Account를 생성하거나 가져오는 중...');
         
-        // 동적으로 SPL Token 라이브러리를 가져옵니다
-        const { getOrCreateAssociatedTokenAccount, transfer } = require('@solana/spl-token');
+        // 공식 문서 방식: getOrCreateAssociatedTokenAccount와 transfer 사용
+        console.log('공식 문서 방식으로 토큰 전송을 시도합니다.');
         
         const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
           connection,
@@ -257,17 +260,17 @@ function App() {
   const getSolBalance = async (address: string) => {
     try {
       const response = await fetch('https://api.devnet.solana.com', {
-        method: 'POST',
+          method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'getBalance',
-          params: [address]
-        })
-      });
-
-      const data = await response.json();
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getBalance',
+            params: [address]
+          })
+        });
+        
+          const data = await response.json();
       if (data.result) {
         setSolBalance(data.result.value / 1000000000); // lamports to SOL
       }
@@ -280,7 +283,7 @@ function App() {
   const getSolPrice = async () => {
     try {
       const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-      const data = await response.json();
+        const data = await response.json();
       setSolPrice(data.solana.usd);
     } catch (error) {
       console.error('SOL 가격 조회 실패:', error);
@@ -301,7 +304,7 @@ function App() {
         await getSolPrice();
         
         alert('✅ Devnet으로 연결되었습니다!\n\n팬텀 월렛에서 Devnet 네트워크로 설정되어 있는지 확인해주세요.');
-      } else {
+          } else {
         alert('Phantom Wallet이 설치되어 있지 않습니다. https://phantom.app/ 에서 설치해주세요.');
       }
     } catch (error) {
