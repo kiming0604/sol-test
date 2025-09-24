@@ -128,9 +128,14 @@ function App() {
         console.log('계정 정보 조회 결과:', result);
         
         if (!result.result || !result.result.value) {
-          console.log('수신자 토큰 계정이 존재하지 않음. 수동 전송 안내로 전환...');
-          // 토큰 계정이 없으면 수동 전송 안내
-          throw new Error('수신자의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.');
+          // 자기 자신에게 전송하는 경우인지 확인
+          if (senderPublicKey.toString() === recipientPublicKey.toString()) {
+            console.log('자기 자신에게 전송하는 경우. 토큰 계정이 없어도 전송 가능.');
+          } else {
+            console.log('수신자 토큰 계정이 존재하지 않음. 수동 전송 안내로 전환...');
+            // 토큰 계정이 없으면 수동 전송 안내
+            throw new Error('수신자의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.');
+          }
         } else {
           console.log('수신자 토큰 계정이 이미 존재함');
         }
