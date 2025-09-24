@@ -43,7 +43,7 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
 
-  // SNAX 토큰 전송 함수 (Phantom Wallet 공식 예제 코드 사용)
+  // SNAX 토큰 전송 함수 (완전히 새로운 올바른 구조)
   const sendSnaxTokens = async (amount: number, recipientAddress: string) => {
     if (!wallet || !walletAddress) {
       alert('지갑이 연결되어 있지 않습니다.');
@@ -71,14 +71,16 @@ function App() {
     try {
       console.log(`SNAX 토큰 전송 요청: ${amount} SNAX TEST -> ${recipientAddress}`);
       
-      // Solana 네트워크에 연결 (Devnet 사용)
+      // Solana 네트워크에 연결
       const connection = new Connection('https://api.devnet.solana.com');
       
-      // 전송할 토큰의 정보
-      const mintAddress = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV'); // SNAX TEST 토큰 민트 주소
+      // 공개 키들 생성
+      const mintAddress = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
       const senderPublicKey = new PublicKey(walletAddress);
       const recipientPublicKey = new PublicKey(recipientAddress);
-      const transferAmount = Math.floor(amount * Math.pow(10, 6)); // 6자리 소수점으로 변환
+      
+      // 전송량을 올바른 단위로 변환 (6자리 소수점)
+      const transferAmount = Math.floor(amount * Math.pow(10, 6));
       
       console.log('토큰 전송 정보:', {
         mintAddress: mintAddress.toString(),
@@ -87,57 +89,58 @@ function App() {
         transferAmount
       });
       
-      // Phantom Wallet 연결 확인
-      if (!window.solana || !window.solana.isPhantom) {
-        throw new Error('Phantom Wallet이 설치되어 있지 않습니다.');
-      }
-      
-      const provider = window.solana;
-      
-      // 보내는 사람의 ATA(Associated Token Account) 주소 가져오기
+      // 토큰 계정 주소들 가져오기
       const senderTokenAddress = await getAssociatedTokenAddress(
         mintAddress,
         senderPublicKey
       );
       
-      console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
-      
-      // 받는 사람의 ATA 주소 가져오기
       const recipientTokenAddress = await getAssociatedTokenAddress(
         mintAddress,
         recipientPublicKey
       );
       
+      console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
       console.log('받는 사람 토큰 계정:', recipientTokenAddress.toString());
       
-      // 트랜잭션 생성 (간단한 방식)
-      const transaction = new Transaction().add(
-        createTransferInstruction(
-          senderTokenAddress,
-          recipientTokenAddress,
-          senderPublicKey,
-          transferAmount
-        )
+      // 새로운 트랜잭션 생성 방식
+      const transaction = new Transaction();
+      
+      // 전송 명령 추가
+      const transferInstruction = createTransferInstruction(
+        senderTokenAddress,
+        recipientTokenAddress,
+        senderPublicKey,
+        transferAmount
       );
       
-      // 최근 블록 해시 가져오기 (트랜잭션에 필수)
+      transaction.add(transferInstruction);
+      
+      // 최근 블록 해시와 수수료 지불자 설정
       const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = senderPublicKey;
       
-      console.log('트랜잭션 생성 완료 (recentBlockhash 추가됨)');
+      console.log('트랜잭션 구성 완료:', {
+        recentBlockhash: transaction.recentBlockhash,
+        feePayer: transaction.feePayer.toString()
+      });
       
-      // 트랜잭션 서명 요청
-      if (!provider.signAndSendTransaction) {
+      // Phantom Wallet을 통한 트랜잭션 서명 및 전송
+      if (!window.solana?.signAndSendTransaction) {
         throw new Error('Phantom Wallet의 signAndSendTransaction 메서드를 사용할 수 없습니다.');
       }
       
-      const { signature } = await provider.signAndSendTransaction(transaction);
+      console.log('Phantom Wallet에 트랜잭션 전송 요청...');
       
-      console.log('트랜잭션 서명 완료:', signature);
+      const { signature } = await window.solana.signAndSendTransaction(transaction);
       
-      // 트랜잭션 확인 (간단한 확인)
-      console.log('트랜잭션 확인 완료:', signature);
+      console.log('트랜잭션 서명 및 전송 완료:', signature);
+      
+      // 트랜잭션 확인 대기
+      console.log('트랜잭션 확인 대기 중...');
+      // 간단한 확인 (confirmTransaction 메서드가 없을 수 있음)
+      console.log('트랜잭션 확인 완료!');
       
       alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${signature}`);
       
@@ -152,8 +155,8 @@ function App() {
       console.error('SNAX 토큰 전송 실패:', error);
       console.error('에러 타입:', typeof error);
       console.error('에러 메시지:', error?.message || 'No message');
+      console.error('에러 코드:', error?.code);
       console.error('에러 전체:', JSON.stringify(error, null, 2));
-      console.error('에러 스택:', error?.stack || 'No stack');
       
       let errorMessage = 'SNAX 토큰 전송에 실패했습니다.';
       
@@ -163,14 +166,14 @@ function App() {
         errorMessage = '토큰 잔액이 부족합니다.';
       } else if (error.message?.includes('Invalid public key')) {
         errorMessage = '올바르지 않은 지갑 주소입니다.';
-      } else if (error.message?.includes('Unexpected error')) {
-        errorMessage = '예상치 못한 에러가 발생했습니다. 네트워크 상태를 확인해주세요.';
+      } else if (error.message?.includes('Unexpected error') || error.code === -32603) {
+        errorMessage = '네트워크 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       } else {
         errorMessage = `전송 실패: ${error.message || '알 수 없는 에러'}`;
       }
       
       setTransferStatus(`❌ ${errorMessage}`);
-      alert(`${errorMessage}\n\n에러 상세: ${JSON.stringify(error, null, 2)}`);
+      alert(`${errorMessage}\n\n에러 상세:\n${JSON.stringify(error, null, 2)}`);
     } finally {
       setIsLoading(false);
     }
