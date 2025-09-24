@@ -147,7 +147,7 @@ function App() {
       if (!recipientAccountExists) {
         console.log('수신자 토큰 계정이 없으므로 생성 명령을 추가합니다.');
         
-        // Associated Token Account 생성 명령을 공식 문서에 맞춰 구성
+        // Associated Token Account 생성 명령을 올바르게 구성
         const createAccountInstruction = {
           programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
           keys: [
