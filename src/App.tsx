@@ -5,12 +5,10 @@ import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
 import { 
   createSolanaRpc,
-  address,
-  createDefaultRpcTransport
+  address
 } from '@solana/kit';
 import { 
-  getAssociatedTokenAddress, 
-  createTransferInstruction
+  getAssociatedTokenAddress
 } from '@solana/spl-token';
 import { PublicKey } from '@solana/web3.js';
 
@@ -89,9 +87,6 @@ function App() {
       const senderPublicKey = new PublicKey(walletAddress);
       const recipientPublicKey = new PublicKey(recipientAddress);
       
-      // Kit용 주소들
-      const mintAddressKit = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
-      const recipientPublicKeyKit = address(recipientAddress);
       
       // 전송량을 올바른 단위로 변환 (6자리 소수점)
       const transferAmount = Math.floor(amount * Math.pow(10, 6));
