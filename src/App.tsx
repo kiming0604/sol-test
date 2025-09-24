@@ -173,7 +173,7 @@ function App() {
                 id: 1,
                 method: 'sendTransaction',
                 params: [
-                  Array.from(serializedTransaction), // Uint8Array를 배열로 변환
+                  Buffer.from(serializedTransaction).toString('base64'), // Base64 문자열로 변환
                   {
                     encoding: 'base64',
                     skipPreflight: false,
