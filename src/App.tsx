@@ -104,8 +104,8 @@ function App() {
       });
       
       // Phantom Wallet의 SPL 토큰 전송 API 시도
-      if (!window.solana) {
-        throw new Error('Phantom Wallet을 사용할 수 없습니다.');
+      if (!window.solana || !window.solana.signAndSendTransaction) {
+        throw new Error('Phantom Wallet 또는 signAndSendTransaction을 사용할 수 없습니다.');
       }
 
       console.log('Phantom Wallet SPL 토큰 전송 시도...');
@@ -135,6 +135,10 @@ function App() {
         console.log('signAndSendTransaction 실패, 대체 방법 시도:', transactionError);
         
         // 방법 2: 간단한 transfer 시도 (SOL 전송 방식)
+        if (!window.solana.request) {
+          throw new Error('Phantom Wallet request 메서드를 사용할 수 없습니다.');
+        }
+        
         const result = await window.solana.request({
           method: 'transfer',
           params: {
