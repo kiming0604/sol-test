@@ -25,7 +25,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "predeploy": "npm run build",
+    "predeploy": "npm install --legacy-peer-deps && npm run build",
     "deploy": "aws s3 sync build/ s3://your-bucket-name --delete"
   },
   "eslintConfig": {
@@ -50,5 +50,11 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
+  },
+  "overrides": {
+    "typescript": "^5.3.3"
+  },
+  "resolutions": {
+    "typescript": "^5.3.3"
   }
 }
