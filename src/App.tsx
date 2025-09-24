@@ -6,6 +6,10 @@ import { COUNTER_PROGRAM_ID } from './types/counter';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
 
+// Buffer polyfill for browser compatibility
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
+
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
   isPhantom?: boolean;
