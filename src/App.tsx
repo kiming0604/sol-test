@@ -140,11 +140,27 @@ function App() {
         // 에러가 발생해도 계속 진행 (계정이 없을 가능성이 높음)
       }
       
-      // 토큰 계정이 없어도 전송을 시도합니다
+      // 토큰 계정이 없으면 생성 명령을 추가합니다 (Solana Cookbook 공식 방식)
       if (!recipientAccountExists) {
-        console.log('수신자 토큰 계정이 없지만 전송을 시도합니다.');
-        console.log('참고: 수신자가 처음 SNAX 토큰을 받으려면 먼저 토큰 계정이 생성되어야 합니다.');
-        console.log('이 전송은 실패할 수 있지만, 수신자에게 토큰 계정 생성을 안내할 수 있습니다.');
+        console.log('수신자 토큰 계정이 없으므로 생성 명령을 추가합니다.');
+        
+        // Associated Token Account 생성 명령을 올바르게 구성
+        const createAccountInstruction = {
+          programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
+          keys: [
+            { pubkey: senderPublicKey, isSigner: true, isWritable: true }, // payer
+            { pubkey: recipientTokenAddress, isSigner: false, isWritable: true }, // ata
+            { pubkey: recipientPublicKey, isSigner: false, isWritable: false }, // owner
+            { pubkey: mintAddress, isSigner: false, isWritable: false }, // mint
+            { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false }, // system program
+            { pubkey: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false }, // token program
+            { pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false }, // rent sysvar
+          ],
+          data: Buffer.from([0]) // create 명령 discriminator
+        };
+        
+        transaction.add(createAccountInstruction);
+        console.log('토큰 계정 생성 명령 추가 완료');
       }
       
       // 전송 명령 추가
