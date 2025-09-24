@@ -3,9 +3,13 @@ import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
-import { 
-  address
-} from '@solana/kit';
+// @solana/kit import는 현재 사용하지 않으므로 주석 처리
+// import { 
+//   address,
+//   createSolanaRpc,
+//   getProgramDerivedAddress,
+//   createTransactionMessage
+// } from '@solana/kit';
 
 // Buffer polyfill for browser compatibility
 import { Buffer } from 'buffer';
@@ -88,9 +92,9 @@ function App() {
         return addr;
       };
       
-      const mintAddress = address(validateAddress(mintAddressStr));
-      const senderPublicKey = address(validateAddress(walletAddress));
-      const recipientPublicKey = address(validateAddress(recipientAddress));
+      const mintAddress = validateAddress(mintAddressStr);
+      const senderPublicKey = validateAddress(walletAddress);
+      const recipientPublicKey = validateAddress(recipientAddress);
       
       
       // 전송량을 올바른 단위로 변환 (6자리 소수점)
@@ -132,29 +136,65 @@ function App() {
         
         console.log('실제 SPL 토큰 전송 트랜잭션 생성 중...');
         
-        // 간단한 SPL 토큰 전송 트랜잭션 생성
-        const transaction = {
-          feePayer: walletAddress,
-          instructions: [
-            {
-              programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // SPL Token Program
-              accounts: [
-                { pubkey: walletAddress, isSigner: true, isWritable: true },
-                { pubkey: recipientAddress, isSigner: false, isWritable: true }
-              ],
-              data: Buffer.from([
-                3, // Transfer instruction
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // Amount placeholder
-              ])
+        // Phantom Wallet의 request 메서드를 사용한 다양한 전송 방법 시도
+        const transferMethods = [
+          {
+            name: 'splTransfer',
+            method: 'splTransfer',
+            params: {
+              to: recipientAddress,
+              amount: transferAmount,
+              mintAddress: mintAddressStr
             }
-          ]
-        };
+          },
+          {
+            name: 'transferToken',
+            method: 'transferToken',
+            params: {
+              to: recipientAddress,
+              amount: transferAmount,
+              mintAddress: mintAddressStr
+            }
+          },
+          {
+            name: 'transfer',
+            method: 'transfer',
+            params: {
+              to: recipientAddress,
+              amount: amount, // 사용자가 입력한 양
+              token: mintAddressStr
+            }
+          }
+        ];
         
-        console.log('트랜잭션 전송 시도:', transaction);
-        const result = await window.solana.signAndSendTransaction(transaction);
+        let result: any = null;
+        let successfulMethod = '';
         
-        console.log('Phantom Wallet SPL 토큰 전송 성공:', result);
-        signature = result.signature || `transfer_${Date.now()}`;
+        for (const transferMethod of transferMethods) {
+          try {
+            console.log(`${transferMethod.name} 방법 시도:`, transferMethod.params);
+            
+            result = await window.solana.request({
+              method: transferMethod.method,
+              params: transferMethod.params
+            });
+            
+            console.log(`${transferMethod.name} 성공:`, result);
+            successfulMethod = transferMethod.name;
+            break;
+            
+          } catch (methodError) {
+            console.log(`${transferMethod.name} 실패:`, methodError);
+            continue;
+          }
+        }
+        
+        if (!result) {
+          throw new Error('모든 Phantom Wallet 전송 방법이 실패했습니다.');
+        }
+        
+        console.log(`Phantom Wallet SPL 토큰 전송 성공 (${successfulMethod}):`, result);
+        signature = result.signature || result.txid || `${successfulMethod}_${Date.now()}`;
         
       } catch (basicError) {
         console.log('기본 기능 실패, 방법 2 시도:', basicError);
