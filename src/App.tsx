@@ -106,6 +106,39 @@ function App() {
       // 새로운 트랜잭션 생성 방식
       const transaction = new Transaction();
       
+      // 수신자의 토큰 계정이 존재하는지 확인 (RPC로 직접 확인)
+      console.log('수신자 토큰 계정 존재 여부 확인 중...');
+      
+      try {
+        const response = await fetch('https://api.devnet.solana.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getAccountInfo',
+            params: [
+              recipientTokenAddress.toString(),
+              { encoding: 'base64' }
+            ]
+          })
+        });
+        
+        const result = await response.json();
+        console.log('계정 정보 조회 결과:', result);
+        
+        if (!result.result || !result.result.value) {
+          console.log('수신자 토큰 계정이 존재하지 않음. 수동 전송 안내로 전환...');
+          // 토큰 계정이 없으면 수동 전송 안내
+          throw new Error('수신자의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.');
+        } else {
+          console.log('수신자 토큰 계정이 이미 존재함');
+        }
+      } catch (accountCheckError) {
+        console.log('계정 확인 중 에러 발생:', accountCheckError);
+        throw new Error('수신자 토큰 계정 확인 중 오류가 발생했습니다.');
+      }
+      
       // 전송 명령 추가
       const transferInstruction = createTransferInstruction(
         senderTokenAddress,
