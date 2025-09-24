@@ -145,9 +145,27 @@ function App() {
         // 에러가 발생해도 계속 진행 (계정이 없을 가능성이 높음)
       }
       
-      // 수신자의 토큰 계정이 없으면 전송을 중단합니다
+      // 수신자의 토큰 계정이 없으면 생성 명령을 추가합니다 (공식 문서 방식)
       if (!recipientAccountExists) {
-        throw new Error(`수신자(${recipientAddress})의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.`);
+        console.log('수신자 토큰 계정이 없으므로 생성 명령을 추가합니다.');
+        
+        // Associated Token Account 생성 명령을 공식 문서에 맞춰 구성
+        const createAccountInstruction = {
+          programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
+          keys: [
+            { pubkey: senderPublicKey, isSigner: true, isWritable: true }, // payer
+            { pubkey: recipientTokenAddress, isSigner: false, isWritable: true }, // ata
+            { pubkey: recipientPublicKey, isSigner: false, isWritable: false }, // owner
+            { pubkey: mintAddress, isSigner: false, isWritable: false }, // mint
+            { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false }, // system program
+            { pubkey: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false }, // token program
+            { pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false }, // rent sysvar
+          ],
+          data: Buffer.from([0]) // create 명령 discriminator
+        };
+        
+        transaction.add(createAccountInstruction);
+        console.log('토큰 계정 생성 명령 추가 완료');
       }
       
       // 전송 명령 추가
