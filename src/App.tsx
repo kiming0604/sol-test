@@ -77,10 +77,20 @@ function App() {
       // Solana 네트워크에 연결 (Kit 사용) - 향후 확장을 위해 준비
       // const rpc = createSolanaRpc('https://api.devnet.solana.com');
       
-      // 공개 키들 생성 (Kit 사용)
-      const mintAddress = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
-      const senderPublicKey = address(walletAddress);
-      const recipientPublicKey = address(recipientAddress);
+      // 주소 검증 및 생성 (Kit 사용)
+      const mintAddressStr = 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV';
+      
+      // 주소 길이 검증 (32-44자)
+      const validateAddress = (addr: string) => {
+        if (addr.length < 32 || addr.length > 44) {
+          throw new Error(`Invalid address length: ${addr.length}. Expected 32-44 characters. Address: ${addr}`);
+        }
+        return addr;
+      };
+      
+      const mintAddress = address(validateAddress(mintAddressStr));
+      const senderPublicKey = address(validateAddress(walletAddress));
+      const recipientPublicKey = address(validateAddress(recipientAddress));
       
       
       // 전송량을 올바른 단위로 변환 (6자리 소수점)
