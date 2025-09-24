@@ -12,6 +12,7 @@ import {
   getAssociatedTokenAddress, 
   createTransferInstruction
 } from '@solana/spl-token';
+import { PublicKey } from '@solana/web3.js';
 
 // Buffer polyfill for browser compatibility
 import { Buffer } from 'buffer';
@@ -83,10 +84,14 @@ function App() {
       // Solana 네트워크에 연결 (Kit 사용)
       const rpc = createSolanaRpc('https://api.devnet.solana.com');
       
-      // 공개 키들 생성
-      const mintAddress = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
-      const senderPublicKey = address(walletAddress);
-      const recipientPublicKey = address(recipientAddress);
+      // 공개 키들 생성 (SPL Token용 PublicKey와 Kit용 Address 모두 생성)
+      const mintAddress = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
+      const senderPublicKey = new PublicKey(walletAddress);
+      const recipientPublicKey = new PublicKey(recipientAddress);
+      
+      // Kit용 주소들
+      const mintAddressKit = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
+      const recipientPublicKeyKit = address(recipientAddress);
       
       // 전송량을 올바른 단위로 변환 (6자리 소수점)
       const transferAmount = Math.floor(amount * Math.pow(10, 6));
@@ -116,7 +121,8 @@ function App() {
       console.log('수신자 토큰 계정 존재 여부 확인 중...');
       
       try {
-        const accountInfo = await rpc.getAccountInfo(recipientTokenAddress).send();
+        const recipientTokenAddressKit = address(recipientTokenAddress.toString());
+        const accountInfo = await rpc.getAccountInfo(recipientTokenAddressKit).send();
         
         if (accountInfo && accountInfo.value) {
           console.log('수신자 토큰 계정이 이미 존재함');
