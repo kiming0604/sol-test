@@ -7,10 +7,6 @@ import {
   createSolanaRpc,
   address
 } from '@solana/kit';
-import { 
-  getAssociatedTokenAddress
-} from '@solana/spl-token';
-import { PublicKey } from '@solana/web3.js';
 
 // Buffer polyfill for browser compatibility
 import { Buffer } from 'buffer';
@@ -82,10 +78,10 @@ function App() {
       // Solana 네트워크에 연결 (Kit 사용)
       const rpc = createSolanaRpc('https://api.devnet.solana.com');
       
-      // 공개 키들 생성 (SPL Token용 PublicKey와 Kit용 Address 모두 생성)
-      const mintAddress = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
-      const senderPublicKey = new PublicKey(walletAddress);
-      const recipientPublicKey = new PublicKey(recipientAddress);
+      // 공개 키들 생성 (Kit 사용)
+      const mintAddress = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
+      const senderPublicKey = address(walletAddress);
+      const recipientPublicKey = address(recipientAddress);
       
       
       // 전송량을 올바른 단위로 변환 (6자리 소수점)
@@ -98,46 +94,11 @@ function App() {
         transferAmount
       });
       
-      // 송신자의 토큰 계정 주소 가져오기
-      const senderTokenAddress = await getAssociatedTokenAddress(
-        mintAddress,
-        senderPublicKey
-      );
-
-      console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
-
-      const recipientTokenAddress = await getAssociatedTokenAddress(
-        mintAddress,
-        recipientPublicKey
-      );
-
-      console.log('받는 사람 토큰 계정:', recipientTokenAddress.toString());
-
-      // 수신자의 토큰 계정이 존재하는지 확인 (Kit 사용)
-      console.log('수신자 토큰 계정 존재 여부 확인 중...');
-      
-      try {
-        const recipientTokenAddressKit = address(recipientTokenAddress.toString());
-        const accountInfo = await rpc.getAccountInfo(recipientTokenAddressKit).send();
-        
-        if (accountInfo && accountInfo.value) {
-          console.log('수신자 토큰 계정이 이미 존재함');
-        } else {
-          throw new Error(`수신자(${recipientAddress})의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.`);
-        }
-      } catch (accountCheckError) {
-        console.log('계정 확인 중 에러 발생:', accountCheckError);
-        throw new Error(`수신자(${recipientAddress})의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.`);
-      }
-
-      // Phantom Wallet을 통한 간단한 토큰 전송
-      console.log('Phantom Wallet을 통한 토큰 전송 시도...');
-      
+      // Phantom Wallet의 간단한 transfer API 시도
       if (!window.solana) {
         throw new Error('Phantom Wallet을 사용할 수 없습니다.');
       }
 
-      // Phantom Wallet의 간단한 transfer API 시도
       const result = await window.solana.request({
         method: 'transfer',
         params: {
