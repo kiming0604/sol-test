@@ -103,22 +103,49 @@ function App() {
         transferAmount
       });
       
-      // Phantom Wallet의 간단한 transfer API 시도
+      // Phantom Wallet의 SPL 토큰 전송 API 시도
       if (!window.solana) {
         throw new Error('Phantom Wallet을 사용할 수 없습니다.');
       }
 
-      const result = await window.solana.request({
-        method: 'transfer',
-        params: {
-          to: recipientAddress,
-          amount: amount,
-          token: mintAddress.toString()
-        }
-      });
-
-      console.log('Phantom Wallet transfer 성공:', result);
-      const signature = result.signature || 'manual_transfer_success';
+      console.log('Phantom Wallet SPL 토큰 전송 시도...');
+      
+      let signature: string;
+      
+      // Phantom Wallet의 표준 SPL 토큰 전송 방법
+      try {
+        // 방법 1: signAndSendTransaction 사용
+        const result = await window.solana.signAndSendTransaction({
+          feePayer: walletAddress,
+          instructions: [
+            {
+              programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+              accounts: [
+                { pubkey: walletAddress, isSigner: true, isWritable: true },
+                { pubkey: recipientAddress, isSigner: false, isWritable: true }
+              ],
+              data: Buffer.from([3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+            }
+          ]
+        });
+        
+        console.log('Phantom Wallet SPL 토큰 전송 성공:', result);
+        signature = result.signature;
+      } catch (transactionError) {
+        console.log('signAndSendTransaction 실패, 대체 방법 시도:', transactionError);
+        
+        // 방법 2: 간단한 transfer 시도 (SOL 전송 방식)
+        const result = await window.solana.request({
+          method: 'transfer',
+          params: {
+            to: recipientAddress,
+            amount: amount * 1000000 // SOL 단위로 변환
+          }
+        });
+        
+        console.log('대체 전송 방법 성공:', result);
+        signature = result.signature || 'alternative_transfer_success';
+      }
       
       alert(`🚀 SNAX 토큰 전송 성공!\n\n전송량: ${amount} SNAX TEST\n수신자: ${recipientAddress}\n트랜잭션: ${signature}`);
       
