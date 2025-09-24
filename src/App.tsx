@@ -4,7 +4,6 @@ import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
 import { 
-  createSolanaRpc,
   address
 } from '@solana/kit';
 
@@ -75,8 +74,8 @@ function App() {
     try {
       console.log(`SNAX 토큰 전송 요청: ${amount} SNAX TEST -> ${recipientAddress}`);
       
-      // Solana 네트워크에 연결 (Kit 사용)
-      const rpc = createSolanaRpc('https://api.devnet.solana.com');
+      // Solana 네트워크에 연결 (Kit 사용) - 향후 확장을 위해 준비
+      // const rpc = createSolanaRpc('https://api.devnet.solana.com');
       
       // 공개 키들 생성 (Kit 사용)
       const mintAddress = address('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
