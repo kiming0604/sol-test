@@ -104,8 +104,8 @@ function App() {
       });
       
       // Phantom Wallet의 SPL 토큰 전송 API 시도
-      if (!window.solana || !window.solana.signAndSendTransaction) {
-        throw new Error('Phantom Wallet 또는 signAndSendTransaction을 사용할 수 없습니다.');
+      if (!window.solana) {
+        throw new Error('Phantom Wallet을 사용할 수 없습니다.');
       }
 
       console.log('Phantom Wallet SPL 토큰 전송 시도...');
@@ -120,12 +120,16 @@ function App() {
         console.log('방법 1: 기본 Phantom Wallet 기능 확인');
         
         // 먼저 연결 상태 확인
-        if (!window.solana.isConnected) {
+        if (!window.solana.isConnected && window.solana.connect) {
           console.log('Phantom Wallet 연결 시도...');
           await window.solana.connect();
         }
         
         // 메시지 서명으로 테스트
+        if (!window.solana.signMessage) {
+          throw new Error('Phantom Wallet signMessage 메서드를 사용할 수 없습니다.');
+        }
+        
         const message = `Transfer ${amount} SNAX TEST to ${recipientAddress}`;
         const signedMessage = await window.solana.signMessage(new TextEncoder().encode(message));
         
