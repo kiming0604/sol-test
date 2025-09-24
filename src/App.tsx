@@ -156,10 +156,47 @@ function App() {
           const signedTransaction = await window.solana.signTransaction(transaction);
           console.log('signTransaction 성공');
           
-          // 수동으로 트랜잭션 전송 (간단한 방법)
-          console.log('수동 전송 시도...');
-          signature = 'manual_signature_' + Date.now(); // 임시 시그니처
-          console.log('수동 전송 성공:', signature);
+          // 실제로 서명된 트랜잭션을 블록체인에 전송
+          console.log('서명된 트랜잭션을 블록체인에 전송 중...');
+          
+          try {
+            // 서명된 트랜잭션을 직렬화하여 전송
+            const serializedTransaction = signedTransaction.serialize();
+            console.log('트랜잭션 직렬화 완료, 크기:', serializedTransaction.length);
+            
+            // RPC를 통해 직접 트랜잭션 전송
+            const response = await fetch('https://api.devnet.solana.com', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'sendTransaction',
+                params: [
+                  Array.from(serializedTransaction), // Uint8Array를 배열로 변환
+                  {
+                    encoding: 'base64',
+                    skipPreflight: false,
+                    preflightCommitment: 'confirmed'
+                  }
+                ]
+              })
+            });
+            
+            const result = await response.json();
+            console.log('RPC 전송 결과:', result);
+            
+            if (result.error) {
+              throw new Error(`RPC 전송 실패: ${result.error.message}`);
+            }
+            
+            signature = result.result;
+            console.log('실제 트랜잭션 전송 성공:', signature);
+            
+          } catch (rpcError: any) {
+            console.error('RPC 전송 실패:', rpcError);
+            throw new Error(`블록체인 전송 실패: ${rpcError.message}`);
+          }
         } catch (signError: any) {
           console.log('signTransaction 실패:', signError);
           
