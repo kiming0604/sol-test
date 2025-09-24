@@ -109,15 +109,16 @@ function App() {
         senderPublicKey
       );
 
+      console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
+
       const recipientTokenAddress = await getAssociatedTokenAddress(
         mintAddress,
         recipientPublicKey
       );
 
-      console.log('보내는 사람 토큰 계정:', senderTokenAddress.toString());
       console.log('받는 사람 토큰 계정:', recipientTokenAddress.toString());
 
-      // 수신자의 토큰 계정이 존재하는지 확인
+      // 수신자의 토큰 계정이 존재하는지 확인 (Kit 사용)
       console.log('수신자 토큰 계정 존재 여부 확인 중...');
       
       try {
@@ -134,7 +135,7 @@ function App() {
         throw new Error(`수신자(${recipientAddress})의 SNAX 토큰 계정이 존재하지 않습니다. 수신자가 먼저 SNAX 토큰을 받아야 합니다.`);
       }
 
-      // 간단한 토큰 전송 (Phantom Wallet 사용)
+      // Phantom Wallet을 통한 간단한 토큰 전송
       console.log('Phantom Wallet을 통한 토큰 전송 시도...');
       
       if (!window.solana) {
