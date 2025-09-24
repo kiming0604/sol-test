@@ -120,7 +120,12 @@ function App() {
         )
       );
       
-      console.log('트랜잭션 생성 완료');
+      // 최근 블록 해시 가져오기 (트랜잭션에 필수)
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = senderPublicKey;
+      
+      console.log('트랜잭션 생성 완료 (recentBlockhash 추가됨)');
       
       // 트랜잭션 서명 요청
       if (!provider.signAndSendTransaction) {
