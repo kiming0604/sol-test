@@ -47,14 +47,14 @@ function App() {
   const sendSnaxTokens = async (amount: number, recipientAddress: string) => {
     if (!wallet || !walletAddress) {
       alert('지갑이 연결되어 있지 않습니다.');
-      return;
-    }
-    
+        return;
+      }
+      
     if (amount <= 0) {
       alert('전송할 토큰 수량을 입력해주세요.');
-      return;
-    }
-    
+        return;
+      }
+
     if (amount > snaxBalance) {
       alert('보유한 SNAX 토큰보다 많은 양을 전송할 수 없습니다.');
       return;
@@ -62,9 +62,9 @@ function App() {
     
     if (!recipientAddress || recipientAddress.length < 32) {
       alert('올바른 지갑 주소를 입력해주세요.');
-      return;
-    }
-
+        return;
+      }
+      
     setIsLoading(true);
     setTransferStatus('전송 요청 중...');
     
@@ -140,30 +140,11 @@ function App() {
         // 에러가 발생해도 계속 진행 (계정이 없을 가능성이 높음)
       }
       
-      // 토큰 계정이 없으면 생성 명령 추가 (수동 구현)
+      // 토큰 계정이 없어도 전송을 시도합니다
       if (!recipientAccountExists) {
-        console.log('토큰 계정 생성 명령을 트랜잭션에 추가합니다.');
-        try {
-          // Associated Token Account 생성 명령을 수동으로 구성
-          const createAccountInstruction = {
-            programId: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // Associated Token Program
-            keys: [
-              { pubkey: senderPublicKey, isSigner: true, isWritable: true }, // payer
-              { pubkey: recipientTokenAddress, isSigner: false, isWritable: true }, // ata
-              { pubkey: recipientPublicKey, isSigner: false, isWritable: false }, // owner
-              { pubkey: mintAddress, isSigner: false, isWritable: false }, // mint
-              { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false }, // system program
-              { pubkey: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false }, // token program
-            ],
-            data: Buffer.from([]) // 빈 데이터
-          };
-          
-          transaction.add(createAccountInstruction);
-          console.log('토큰 계정 생성 명령 추가 완료');
-        } catch (createError) {
-          console.error('토큰 계정 생성 명령 추가 실패:', createError);
-          // 생성 명령 추가에 실패해도 전송은 시도해봅니다
-        }
+        console.log('수신자 토큰 계정이 없지만 전송을 시도합니다.');
+        console.log('참고: 수신자가 처음 SNAX 토큰을 받으려면 먼저 토큰 계정이 생성되어야 합니다.');
+        console.log('이 전송은 실패할 수 있지만, 수신자에게 토큰 계정 생성을 안내할 수 있습니다.');
       }
       
       // 전송 명령 추가
@@ -226,11 +207,11 @@ function App() {
             
             // RPC를 통해 직접 트랜잭션 전송
             const response = await fetch('https://api.devnet.solana.com', {
-              method: 'POST',
+            method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
                 method: 'sendTransaction',
                 params: [
                   Buffer.from(serializedTransaction).toString('base64'), // Base64 문자열로 변환
@@ -240,9 +221,9 @@ function App() {
                     preflightCommitment: 'confirmed'
                   }
                 ]
-              })
-            });
-            
+            })
+          });
+
             const result = await response.json();
             console.log('RPC 전송 결과:', result);
             
