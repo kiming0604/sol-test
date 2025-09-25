@@ -10,7 +10,7 @@ window.Buffer = Buffer;
 
 // 솔라나 라이브러리 import
 import { Connection, PublicKey, Transaction, Commitment } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
@@ -38,7 +38,6 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
 
-  // ✅ Connection 생성자를 올바르게 수정했습니다.
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
 
