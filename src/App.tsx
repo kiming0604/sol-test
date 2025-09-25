@@ -200,63 +200,77 @@ function App() {
       console.log('[DEBUG] Decimals:', decimals);
       console.log('[DEBUG] 전송할 토큰 양 (raw):', transferAmount);
       
-      // 최신 블록해시 가져오기
-      const latestBlockhash = await connection.getLatestBlockhash(commitment);
+      setTransferStatus('⏳ 트랜잭션 생성 중...');
       
-      // 트랜잭션 생성
-      const transaction = new Transaction({
-        recentBlockhash: latestBlockhash.blockhash,
-        feePayer: senderPublicKey,
-      });
-
-      // 받는 사람의 토큰 계정 확인 및 필요시 생성
+      // 1. 받는 사람의 토큰 계정이 없는 경우, ATA 생성 트랜잭션 먼저 전송
       const recipientAccountInfo = await connection.getAccountInfo(recipientTokenAccountAddress, commitment);
       
       if (recipientAccountInfo === null) {
-        console.log('[DEBUG] 받는 사람 토큰 계정이 없어 생성 명령을 추가합니다.');
-        transaction.add(
+        console.log('[DEBUG] 받는 사람 토큰 계정이 없어 ATA 생성 트랜잭션을 전송합니다.');
+        const latestBlockhash = await connection.getLatestBlockhash(commitment);
+        
+        const createAtaTransaction = new Transaction({
+          recentBlockhash: latestBlockhash.blockhash,
+          feePayer: senderPublicKey,
+        }).add(
           createAssociatedTokenAccountInstruction(
-            senderPublicKey, // payer
-            recipientTokenAccountAddress, // associatedToken
-            recipientPublicKey, // owner
-            mintPublicKey // mint
+            senderPublicKey,
+            recipientTokenAccountAddress,
+            recipientPublicKey,
+            mintPublicKey
           )
         );
+        
+        console.log('[DEBUG] ATA 생성 트랜잭션 객체:', createAtaTransaction); 
+        
+        setTransferStatus('✍️ 지갑 서명을 기다리는 중 (ATA 생성)...');
+        const { signature: createAtaSignature } = await wallet.signAndSendTransaction(createAtaTransaction);
+        
+        setTransferStatus('🔗 ATA 생성 트랜잭션 확인 중...');
+        await connection.confirmTransaction({
+          signature: createAtaSignature,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+        }, commitment);
+        console.log('[DEBUG] ATA 생성 트랜잭션 확인 완료:', createAtaSignature);
       } else {
         console.log('[DEBUG] 받는 사람 토큰 계정이 이미 존재합니다.');
       }
       
-      // 전송 명령 추가
-      transaction.add(
+      // 2. 토큰 전송 트랜잭션 전송
+      console.log('[DEBUG] 토큰 전송 트랜잭션을 생성합니다.');
+      const latestBlockhash = await connection.getLatestBlockhash(commitment);
+
+      const transferTransaction = new Transaction({
+        recentBlockhash: latestBlockhash.blockhash,
+        feePayer: senderPublicKey,
+      }).add(
         createTransferInstruction(
-          actualSenderTokenAccount, // 실제 토큰 계정에서 전송
-          recipientTokenAccountAddress, // destination
-          senderPublicKey, // owner
-          transferAmount // amount
+          actualSenderTokenAccount,
+          recipientTokenAccountAddress,
+          senderPublicKey,
+          transferAmount
         )
       );
-      console.log('[DEBUG] 전송 명령이 트랜잭션에 추가되었습니다.');
 
-      // ⭐ 추가된 코드: 트랜잭션 객체 전체를 로그에 출력합니다.
-      console.log('[DEBUG] 최종 트랜잭션 객체:', transaction); 
-
-      // 트랜잭션 서명 및 전송
-      setTransferStatus('✍️ 지갑 서명을 기다리는 중...');
+      console.log('[DEBUG] 최종 토큰 전송 트랜잭션 객체:', transferTransaction); 
+      
+      setTransferStatus('✍️ 지갑 서명을 기다리는 중 (토큰 전송)...');
       console.log('[DEBUG] 지갑 서명 요청');
       
-      const { signature } = await wallet.signAndSendTransaction(transaction);
+      const { signature } = await wallet.signAndSendTransaction(transferTransaction);
       console.log('[DEBUG] 트랜잭션 서명:', signature);
       
       setTransferStatus('🔗 트랜잭션 확인 중...');
 
       // 트랜잭션 확인
-      const confirmation = await connection.confirmTransaction({
+      await connection.confirmTransaction({
         signature: signature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
       }, commitment);
       
-      console.log('[DEBUG] 트랜잭션 확인 완료:', confirmation);
+      console.log('[DEBUG] 트랜잭션 확인 완료:', signature);
 
       // 성공 처리
       alert(`🚀 SNAX 토큰 전송 성공!\n트랜잭션 ID: ${signature}`);
