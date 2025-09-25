@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
@@ -17,6 +17,7 @@ import {
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
+// ... 인터페이스 선언 (이전과 동일) ...
 interface PhantomWallet {
   isPhantom?: boolean;
   connect: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: PublicKey }>;
@@ -36,6 +37,7 @@ interface TokenAccount extends Account {
   decimals: number;
 }
 
+
 function App() {
   const [wallet, setWallet] = useState<PhantomWallet | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>('');
@@ -45,6 +47,9 @@ function App() {
   const [snaxDecimals, setSnaxDecimals] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
+  
+  // StrictMode 중복 실행 방지를 위한 잠금 장치 (useRef)
+  const isSending = useRef(false);
 
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
@@ -87,18 +92,15 @@ function App() {
   }, [connection, commitment]);
 
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
-    // 수정: isLoading이 true이면 함수를 즉시 종료하여 중복 실행 방지
-    if (isLoading) return;
+    // useRef를 이용한 중복 실행 방지
+    if (isSending.current) return;
 
-    if (!wallet || !walletAddress || !wallet.signTransaction) {
-      alert('지갑이 연결되어 있지 않거나 전송 기능을 지원하지 않습니다.');
+    if (!wallet || !walletAddress || !wallet.signTransaction || snaxDecimals === null) {
+      alert('지갑이 연결되지 않았거나 토큰 정보가 로드되지 않았습니다.');
       return;
     }
-    if (snaxDecimals === null) {
-        alert('토큰 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
-        return;
-    }
-
+    
+    isSending.current = true;
     setIsLoading(true);
     setTransferStatus('🚀 트랜잭션 준비중...');
 
@@ -110,14 +112,16 @@ function App() {
 
       const senderTokenAccount = await getAssociatedTokenAddress(mintPublicKey, senderPublicKey, false, TOKEN_2022_PROGRAM_ID);
       const recipientTokenAccount = await getAssociatedTokenAddress(mintPublicKey, recipientPublicKey, false, TOKEN_2022_PROGRAM_ID);
-
-      const senderAccountInfo = await getAccount(connection, senderTokenAccount, commitment, TOKEN_2022_PROGRAM_ID) as TokenAccount;
-      const actualBalance = Number(senderAccountInfo.amount) / (10 ** decimals);
+      
+      let actualBalance = 0;
+      try {
+        const senderAccountInfo = await getAccount(connection, senderTokenAccount, commitment, TOKEN_2022_PROGRAM_ID) as TokenAccount;
+        actualBalance = Number(senderAccountInfo.amount) / (10 ** decimals);
+      } catch (e) { /* 잔액 조회 실패 시 0으로 처리 */ }
 
       if (actualBalance < amount) {
         alert(`SNAX 잔액 부족: 현재 ${actualBalance} SNAX`);
         setTransferStatus('❌ 잔액 부족');
-        setIsLoading(false); // 로딩 상태를 다시 false로 변경
         return;
       }
 
@@ -125,28 +129,11 @@ function App() {
       const recipientInfo = await connection.getAccountInfo(recipientTokenAccount);
 
       if (!recipientInfo) {
-        tx.add(
-          createAssociatedTokenAccountInstruction(
-            senderPublicKey,
-            recipientTokenAccount,
-            recipientPublicKey,
-            mintPublicKey,
-            TOKEN_2022_PROGRAM_ID
-          )
-        );
+        tx.add(createAssociatedTokenAccountInstruction(senderPublicKey, recipientTokenAccount, recipientPublicKey, mintPublicKey, TOKEN_2022_PROGRAM_ID));
       }
 
-      tx.add(
-        createTransferInstruction(
-          senderTokenAccount,
-          recipientTokenAccount,
-          senderPublicKey,
-          BigInt(Math.floor(amount * (10 ** decimals))),
-          [],
-          TOKEN_2022_PROGRAM_ID
-        )
-      );
-
+      tx.add(createTransferInstruction(senderTokenAccount, recipientTokenAccount, senderPublicKey, BigInt(Math.floor(amount * (10 ** decimals))), [], TOKEN_2022_PROGRAM_ID));
+      
       const latestBlockhash = await connection.getLatestBlockhash(commitment);
       tx.recentBlockhash = latestBlockhash.blockhash;
       tx.feePayer = senderPublicKey;
@@ -156,30 +143,39 @@ function App() {
       const sig = await connection.sendRawTransaction(signed.serialize());
 
       setTransferStatus('🔗 트랜잭션 확인 중...');
-      await connection.confirmTransaction(
-        {
-          signature: sig,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        },
-        commitment
-      );
-
-      alert(`🚀 SNAX 전송 성공! 트랜잭션: ${sig}`);
+      await connection.confirmTransaction({ signature: sig, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, commitment);
+      
       setTransferStatus('✅ 전송 완료!');
       setTimeout(() => getSnaxBalance(walletAddress, decimals), 2000);
+
+      // --- 수정된 부분 ---
+      // 1. Solscan URL 생성
+      const solscanUrl = `https://solscan.io/tx/${sig}?cluster=devnet`;
+      
+      // 2. confirm 팝업으로 사용자에게 질문
+      const userConfirmation = window.confirm(
+        "🚀 SNAX 전송 성공!\n\nSolscan에서 트랜잭션을 확인하시겠습니까?"
+      );
+
+      // 3. 사용자가 '확인'을 누르면 새 탭에서 URL 열기
+      if (userConfirmation) {
+        window.open(solscanUrl, '_blank', 'noopener,noreferrer');
+      }
+      // --- 여기까지 수정 ---
 
     } catch (error: any) {
       console.error('[ERROR] SNAX 전송 실패:', error);
       let msg = error.message || '알 수 없는 오류';
       if (msg.includes('User rejected')) msg = '사용자가 트랜잭션을 거부했습니다.';
       setTransferStatus(`❌ ${msg}`);
-      alert(msg);
+      alert(msg); // 실패 시에는 사용자에게 alert로 알려줍니다.
     } finally {
+      isSending.current = false;
       setIsLoading(false);
     }
-  }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals, isLoading]); // 수정: 의존성 배열에 isLoading 추가
+  }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals]);
 
+  // ... (getSolPrice, connectWallet, useEffect, requestTestSol, return 등 나머지 코드는 이전과 동일)
   const getSolPrice = useCallback(async () => {
     try {
       const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
@@ -259,6 +255,7 @@ function App() {
       alert('테스트 SOL 요청 실패');
     }
   }, [walletAddress, connection, getSolBalance, commitment]);
+
 
   return (
     <div className="App">
