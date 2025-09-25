@@ -10,7 +10,6 @@ import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 
 import { Buffer } from 'buffer';
@@ -50,12 +49,9 @@ function App() {
       const mintPublicKey = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
       const ownerPublicKey = new PublicKey(address);
 
-      const tokenAccountAddress = await getAssociatedTokenAddress(
-        mintPublicKey,
-        ownerPublicKey
-      );
-
+      const tokenAccountAddress = await getAssociatedTokenAddress(mintPublicKey, ownerPublicKey);
       const accountInfo = await connection.getAccountInfo(tokenAccountAddress, commitment);
+
       if (!accountInfo) {
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
           ownerPublicKey,
@@ -116,13 +112,19 @@ function App() {
       const mintPublicKey = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
 
       // 보내는 사람 토큰 계정
-      const senderTokenAccounts = await connection.getParsedTokenAccountsByOwner(senderPublicKey, { mint: mintPublicKey }, commitment);
+      const senderTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+        senderPublicKey,
+        { mint: mintPublicKey },
+        commitment
+      );
+
       if (senderTokenAccounts.value.length === 0) {
         alert('SNAX 토큰 계정을 찾을 수 없습니다.');
         setIsLoading(false);
         setTransferStatus('');
         return;
       }
+
       const actualSenderTokenAccount = senderTokenAccounts.value[0].pubkey;
       const actualBalance = senderTokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
       const decimals = senderTokenAccounts.value[0].account.data.parsed.info.tokenAmount.decimals;
@@ -149,6 +151,7 @@ function App() {
         feePayer: senderPublicKey,
       });
 
+      // 수신자 계정 없으면 생성
       if (!recipientAccountInfo) {
         tx.add(
           createAssociatedTokenAccountInstruction(
@@ -160,12 +163,15 @@ function App() {
         );
       }
 
+      // 토큰 전송
       tx.add(
         createTransferInstruction(
           actualSenderTokenAccount,
           recipientTokenAccountAddress,
           senderPublicKey,
-          transferAmount
+          transferAmount,
+          [],
+          TOKEN_PROGRAM_ID
         )
       );
 
