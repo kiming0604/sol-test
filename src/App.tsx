@@ -90,7 +90,12 @@ function App() {
 
       const transferAmount = amount * Math.pow(10, 6);
       
-      const transaction = new Transaction().add(
+      const latestBlockhash = await connection.getLatestBlockhash();
+      
+      const transaction = new Transaction({
+        recentBlockhash: latestBlockhash.blockhash,
+        feePayer: senderPublicKey,
+      }).add(
         createTransferInstruction(
           senderTokenAccountAddress,
           recipientTokenAccountAddress,
@@ -98,10 +103,6 @@ function App() {
           transferAmount
         )
       );
-
-      const latestBlockhash = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
-      transaction.feePayer = senderPublicKey;
 
       setTransferStatus('✍️ 지갑 서명을 기다리는 중...');
 
@@ -120,10 +121,25 @@ function App() {
 
     } catch (error: any) {
       console.error('SNAX 토큰 전송 실패:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+        stack: error.stack
+      });
+      
       let errorMessage = `전송 실패: ${error.message || '알 수 없는 에러'}`;
-      if (error.message?.includes('User rejected')) {
+      
+      if (error.message?.includes('User rejected') || error.code === 4001) {
         errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = '잔액이 부족합니다.';
+      } else if (error.message?.includes('Token account not found')) {
+        errorMessage = '토큰 계정을 찾을 수 없습니다.';
+      } else if (error.message?.includes('Invalid address')) {
+        errorMessage = '잘못된 주소입니다.';
       }
+      
       setTransferStatus(`❌ ${errorMessage}`);
       alert(errorMessage);
     } finally {
