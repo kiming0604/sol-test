@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'; // 수정: useRef import
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
@@ -17,7 +17,6 @@ import {
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
-// ... (PhantomWallet, TokenAccount 인터페이스 등은 이전과 동일)
 interface PhantomWallet {
   isPhantom?: boolean;
   connect: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: PublicKey }>;
@@ -37,7 +36,6 @@ interface TokenAccount extends Account {
   decimals: number;
 }
 
-
 function App() {
   const [wallet, setWallet] = useState<PhantomWallet | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>('');
@@ -47,9 +45,6 @@ function App() {
   const [snaxDecimals, setSnaxDecimals] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
-
-  // 수정: 중복 실행을 막기 위한 ref 잠금 변수 생성
-  const isSending = useRef(false);
 
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
@@ -92,8 +87,8 @@ function App() {
   }, [connection, commitment]);
 
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
-    // 수정: isLoading 대신 isSending.current를 확인하여 즉시 잠금
-    if (isSending.current) return;
+    // 수정: isLoading이 true이면 함수를 즉시 종료하여 중복 실행 방지
+    if (isLoading) return;
 
     if (!wallet || !walletAddress || !wallet.signTransaction) {
       alert('지갑이 연결되어 있지 않거나 전송 기능을 지원하지 않습니다.');
@@ -103,9 +98,7 @@ function App() {
         alert('토큰 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
         return;
     }
-    
-    // 수정: 잠금 시작
-    isSending.current = true; 
+
     setIsLoading(true);
     setTransferStatus('🚀 트랜잭션 준비중...');
 
@@ -124,8 +117,7 @@ function App() {
       if (actualBalance < amount) {
         alert(`SNAX 잔액 부족: 현재 ${actualBalance} SNAX`);
         setTransferStatus('❌ 잔액 부족');
-        setIsLoading(false);
-        isSending.current = false; // 수정: 실패 시 잠금 해제
+        setIsLoading(false); // 로딩 상태를 다시 false로 변경
         return;
       }
 
@@ -184,13 +176,10 @@ function App() {
       setTransferStatus(`❌ ${msg}`);
       alert(msg);
     } finally {
-      // 수정: 작업이 끝나면 반드시 잠금 해제
-      isSending.current = false;
       setIsLoading(false);
     }
-  }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals]); // 수정: isLoading 의존성 제거
+  }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals, isLoading]); // 수정: 의존성 배열에 isLoading 추가
 
-  // ... (getSolPrice, connectWallet, useEffect, requestTestSol 등 나머지 코드는 동일)
   const getSolPrice = useCallback(async () => {
     try {
       const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
@@ -270,7 +259,6 @@ function App() {
       alert('테스트 SOL 요청 실패');
     }
   }, [walletAddress, connection, getSolBalance, commitment]);
-
 
   return (
     <div className="App">
