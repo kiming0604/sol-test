@@ -9,7 +9,8 @@ import { Connection, PublicKey, Transaction, Commitment } from '@solana/web3.js'
 import { 
   getAssociatedTokenAddress, 
   createAssociatedTokenAccountInstruction, 
-  createTransferInstruction 
+  createTransferInstruction,
+  TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 
 // Buffer polyfill
@@ -249,7 +250,9 @@ function App() {
           actualSenderTokenAccount,
           recipientTokenAccountAddress,
           senderPublicKey,
-          transferAmount
+          transferAmount,
+          [],
+          TOKEN_PROGRAM_ID
         )
       );
 
