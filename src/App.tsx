@@ -4,20 +4,16 @@ import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
 
-// 솔라나 라이브러리 import
 import { Connection, PublicKey, Transaction, Commitment } from '@solana/web3.js';
-import { 
-  getAssociatedTokenAddress, 
-  createAssociatedTokenAccountInstruction, 
+import {
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 
-// Buffer polyfill
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
-
-
 
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
@@ -25,11 +21,10 @@ interface PhantomWallet {
   connect: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: PublicKey }>;
   disconnect: () => Promise<void>;
   isConnected?: boolean;
-  signAndSendTransaction: (transaction: Transaction) => Promise<{ signature: string }>;
+  signTransaction: (transaction: Transaction) => Promise<Transaction>;
   [key: string]: any;
 }
 
-// Window 타입 확장
 declare global {
   interface Window {
     solana?: PhantomWallet;
@@ -48,68 +43,36 @@ function App() {
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
 
-  // SNAX 토큰 잔액 조회
+  // SNAX 잔액 조회
   const getSnaxBalance = useCallback(async (address: string) => {
     try {
-      console.log('[DEBUG] getSnaxBalance 호출. 주소:', address);
-      
+      console.debug('[DEBUG] getSnaxBalance 호출. 주소:', address);
       const mintPublicKey = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
       const ownerPublicKey = new PublicKey(address);
-      
-      // Associated Token Account 주소 계산
-      const tokenAccountAddress = await getAssociatedTokenAddress(
-        mintPublicKey, 
-        ownerPublicKey,
-        false // allowOwnerOffCurve - false가 기본값
-      );
-      
-      console.log('[DEBUG] 토큰 계정 주소 (Associated):', tokenAccountAddress.toString());
-      console.log('[DEBUG] 민트 주소:', mintPublicKey.toString());
-      
-      // 토큰 계정 정보 조회 시도
+
+      const tokenAccountAddress = await getAssociatedTokenAddress(mintPublicKey, ownerPublicKey, false);
+      console.debug('[DEBUG] 계산된 Associated 주소:', tokenAccountAddress.toString());
+
       const accountInfo = await connection.getAccountInfo(tokenAccountAddress, commitment);
-      
       if (accountInfo === null) {
-        console.log('[DEBUG] Associated 토큰 계정을 찾을 수 없습니다. 다른 토큰 계정 확인 중...');
-        
-        // 모든 토큰 계정 조회 (Associated가 아닌 계정도 포함)
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          ownerPublicKey,
-          { mint: mintPublicKey },
-          commitment
-        );
-        
-        console.log('[DEBUG] 찾은 토큰 계정 수:', tokenAccounts.value.length);
-        
+        console.debug('[DEBUG] Associated 토큰 계정 없음 -> 모든 토큰 계정 조회');
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, { mint: mintPublicKey }, commitment);
         if (tokenAccounts.value.length > 0) {
-          // 첫 번째 토큰 계정의 잔액 사용
           const tokenAccount = tokenAccounts.value[0];
           const balance = tokenAccount.account.data.parsed.info.tokenAmount.uiAmount;
-          console.log('[DEBUG] SNAX 잔액 (대체 계정):', balance);
-          console.log('[DEBUG] 실제 토큰 계정 주소:', tokenAccount.pubkey.toString());
-          console.log('[DEBUG] Decimals:', tokenAccount.account.data.parsed.info.tokenAmount.decimals);
           setSnaxBalance(balance || 0);
+          console.debug('[DEBUG] 대체 토큰 계정 잔액:', balance, '계정:', tokenAccount.pubkey.toString());
           return balance || 0;
         } else {
-          console.log('[DEBUG] SNAX 토큰 계정이 전혀 없습니다.');
           setSnaxBalance(0);
           return 0;
         }
       }
-      
-      // Associated Token Account가 존재하는 경우
-      try {
-        const balance = await connection.getTokenAccountBalance(tokenAccountAddress, commitment);
-        console.log('[DEBUG] SNAX 잔액 (Associated):', balance.value.uiAmount);
-        console.log('[DEBUG] Raw amount:', balance.value.amount);
-        console.log('[DEBUG] Decimals:', balance.value.decimals);
-        setSnaxBalance(balance.value.uiAmount || 0);
-        return balance.value.uiAmount || 0;
-      } catch (error) {
-        console.error('[ERROR] 토큰 잔액 조회 실패:', error);
-        setSnaxBalance(0);
-        return 0;
-      }
+
+      const balance = await connection.getTokenAccountBalance(tokenAccountAddress, commitment);
+      setSnaxBalance(balance.value.uiAmount || 0);
+      console.debug('[DEBUG] Associated 토큰 잔액:', balance.value.uiAmount);
+      return balance.value.uiAmount || 0;
     } catch (error) {
       console.error('[ERROR] getSnaxBalance 에러:', error);
       setSnaxBalance(0);
@@ -120,178 +83,177 @@ function App() {
   // SOL 잔액 조회
   const getSolBalance = useCallback(async (address: string) => {
     try {
-      console.log('[DEBUG] getSolBalance 호출. 주소:', address);
+      console.debug('[DEBUG] getSolBalance 호출. 주소:', address);
       const balance = await connection.getBalance(new PublicKey(address), commitment);
-      console.log('[DEBUG] SOL 잔액 조회 성공:', balance / 1e9);
       setSolBalance(balance / 1e9);
+      console.debug('[DEBUG] SOL 잔액 조회 성공:', balance / 1e9);
     } catch (error) {
       console.error('[ERROR] SOL 잔액 조회 실패:', error);
     }
   }, [connection, commitment]);
 
-  // SNAX 토큰 전송 함수 (수정된 버전)
+  // SNAX 전송 (ATA가 없으면 ATA 생성 + 전송을 같은 트랜잭션에 포함)
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
-    if (!wallet || !walletAddress || !wallet.signAndSendTransaction) {
+    if (!wallet || !walletAddress || !wallet.signTransaction) {
       alert('지갑이 연결되어 있지 않거나, 전송 기능을 지원하지 않습니다.');
       return;
     }
-    
-    // 수신자 주소 유효성 검사
+
     try {
       new PublicKey(recipientAddress);
-    } catch (error) {
+    } catch {
       alert('유효하지 않은 수신자 주소입니다.');
       return;
     }
-    
+
     setIsLoading(true);
-    setTransferStatus('⏳ 트랜잭션 생성 중...');
-    
-    console.log('[DEBUG] sendSnaxTokens 시작');
-    console.log('[DEBUG] 전송량:', amount, 'SNAX');
-    console.log('[DEBUG] 수신자:', recipientAddress);
-    console.log('[DEBUG] 현재 SNAX 잔액:', snaxBalance);
+    setTransferStatus('⏳ 트랜잭션 준비 중...');
 
     try {
+      console.debug('[DEBUG] sendSnaxTokens 시작', { amount, recipientAddress, snaxBalance });
+
       const senderPublicKey = new PublicKey(walletAddress);
       const recipientPublicKey = new PublicKey(recipientAddress);
       const mintPublicKey = new PublicKey('ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV');
 
-      // 실제 보유한 토큰 계정 찾기
-      const senderTokenAccounts = await connection.getParsedTokenAccountsByOwner(
-        senderPublicKey,
-        { mint: mintPublicKey },
-        commitment
-      );
-      
+      // 보내는 사람의 실제 토큰 계정 조회
+      const senderTokenAccounts = await connection.getParsedTokenAccountsByOwner(senderPublicKey, { mint: mintPublicKey }, commitment);
       if (senderTokenAccounts.value.length === 0) {
-        alert('SNAX 토큰 계정을 찾을 수 없습니다. 토큰을 보유하고 있는지 확인해주세요.');
+        alert('SNAX 토큰 계정을 찾을 수 없습니다. 토큰 보유 여부를 확인하세요.');
         setIsLoading(false);
         setTransferStatus('');
         return;
       }
-      
-      // 실제 토큰 계정 주소 (Associated가 아닐 수 있음)
       const actualSenderTokenAccount = senderTokenAccounts.value[0].pubkey;
       const actualBalance = senderTokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-      
-      console.log('[DEBUG] 실제 보내는 사람 토큰 계정:', actualSenderTokenAccount.toString());
-      console.log('[DEBUG] 실제 잔액:', actualBalance);
-      
-      // 잔액 체크
+      const decimals = senderTokenAccounts.value[0].account.data.parsed.info.tokenAmount.decimals;
+      console.debug('[DEBUG] 발신자 토큰 계정:', actualSenderTokenAccount.toString(), '잔액:', actualBalance, 'decimals:', decimals);
+
       if (actualBalance < amount) {
         alert(`SNAX 잔액이 부족합니다. 현재 잔액: ${actualBalance} SNAX`);
         setIsLoading(false);
         setTransferStatus('');
         return;
       }
-      
-      // 받는 사람의 Associated Token Account 주소
-      const recipientTokenAccountAddress = await getAssociatedTokenAddress(
-        mintPublicKey, 
-        recipientPublicKey,
-        false
-      );
-      
-      console.log('[DEBUG] 받는 사람 토큰 계정 (Associated):', recipientTokenAccountAddress.toString());
 
-      // 토큰 양 계산 (decimals 확인)
-      const decimals = senderTokenAccounts.value[0].account.data.parsed.info.tokenAmount.decimals;
-      const transferAmount = amount * Math.pow(10, decimals);
-      console.log('[DEBUG] Decimals:', decimals);
-      console.log('[DEBUG] 전송할 토큰 양 (raw):', transferAmount);
-      
-      setTransferStatus('⏳ 트랜잭션 생성 중...');
-      
-      // 1. 받는 사람의 토큰 계정이 없는 경우, ATA 생성 트랜잭션 전송 로직 대신 경고창 표시
+      // 수신자 ATA 주소 계산
+      const recipientTokenAccountAddress = await getAssociatedTokenAddress(mintPublicKey, recipientPublicKey, false);
+      console.debug('[DEBUG] 수신자 ATA 예측 주소:', recipientTokenAccountAddress.toString());
+
+      // 정수형(원시 단위)으로 변환 (BigInt)
+      const transferAmount = BigInt(Math.floor(amount * Math.pow(10, decimals)));
+      console.debug('[DEBUG] 전송할 토큰 양 (raw BigInt):', transferAmount.toString());
+
+      // ATA 존재 여부 확인
       const recipientAccountInfo = await connection.getAccountInfo(recipientTokenAccountAddress, commitment);
-      
-      if (recipientAccountInfo === null) {
-        alert('받는 사람의 SNAX 토큰 계정(ATA)이 없습니다. 전송을 계속하기 전에 수동으로 토큰을 추가해주세요.');
-        setIsLoading(false);
-        setTransferStatus('❌ 전송 실패: 수신자 ATA가 없음.');
-        console.error('오류: 수신자 ATA가 존재하지 않습니다. 사용자에게 수동 생성을 요청합니다.');
-        return;
-      } else {
-        console.log('[DEBUG] 받는 사람 토큰 계정이 이미 존재합니다.');
-      }
-      
-      // 2. 토큰 전송 트랜잭션 전송
-      console.log('[DEBUG] 토큰 전송 트랜잭션을 생성합니다.');
+
+      // 최신 블록해시 얻기 (전송 직전에 다시 얻음)
       const latestBlockhash = await connection.getLatestBlockhash(commitment);
 
-      const transferTransaction = new Transaction({
-        recentBlockhash: latestBlockhash.blockhash,
-        feePayer: senderPublicKey,
-      }).add(
-        createTransferInstruction(
-          actualSenderTokenAccount,
-          recipientTokenAccountAddress,
-          senderPublicKey,
-          transferAmount,
-          [],
-          TOKEN_PROGRAM_ID
-        )
-      );
+      // 한 번의 TX로 ATA 생성 + 전송 처리 (ATA가 없을 때)
+      if (recipientAccountInfo === null) {
+        console.debug('[DEBUG] 수신자 ATA 없음 -> ATA 생성 + 전송을 하나의 트랜잭션으로 처리합니다.');
 
-      console.log('[DEBUG] 최종 토큰 전송 트랜잭션 객체:', transferTransaction); 
-      
-      setTransferStatus('✍️ 지갑 서명을 기다리는 중 (토큰 전송)...');
-      console.log('[DEBUG] 지갑 서명 요청');
-      
-      const { signature } = await wallet.signAndSendTransaction(transferTransaction);
-      console.log('[DEBUG] 트랜잭션 서명:', signature);
-      
-      setTransferStatus('🔗 트랜잭션 확인 중...');
+        const tx = new Transaction({
+          recentBlockhash: latestBlockhash.blockhash,
+          feePayer: senderPublicKey,
+        });
 
-      // 트랜잭션 확인
-      await connection.confirmTransaction({
-        signature: signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-      }, commitment);
-      
-      console.log('[DEBUG] 트랜잭션 확인 완료:', signature);
+        // ATA 생성 instruction
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            senderPublicKey,              // payer
+            recipientTokenAccountAddress, // associated token addr
+            recipientPublicKey,           // owner of the ATA
+            mintPublicKey                 // mint
+          )
+        );
 
-      // 성공 처리
-      alert(`🚀 SNAX 토큰 전송 성공!\n트랜잭션 ID: ${signature}`);
-      setTransferStatus(`✅ 전송 완료!`);
-      
-      // 잔액 업데이트 (2초 후)
-      setTimeout(() => {
-        getSnaxBalance(walletAddress);
-        console.log('[DEBUG] 잔액 업데이트 요청');
-      }, 2000);
+        // 토큰 전송 instruction
+        tx.add(
+          createTransferInstruction(
+            actualSenderTokenAccount,
+            recipientTokenAccountAddress,
+            senderPublicKey,
+            transferAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+
+        console.debug('[DEBUG] 서명 전 트랜잭션:', tx);
+
+        // Phantom에게 서명 요청
+        setTransferStatus('✍️ 지갑 서명을 기다리는 중 (ATA 생성 + 토큰 전송)...');
+        const signed = await wallet.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
+        setTransferStatus('🔗 트랜잭션 확인 중...');
+        await connection.confirmTransaction({
+          signature: sig,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+        }, commitment);
+
+        console.debug('[DEBUG] ATA 생성 + 전송 완료:', sig);
+        alert(`🚀 SNAX 전송 성공! 트랜잭션: ${sig}`);
+        setTransferStatus('✅ 전송 완료!');
+
+      } else {
+        // ATA가 이미 존재하면 전송만
+        console.debug('[DEBUG] 수신자 ATA 존재 -> 전송만 수행');
+
+        const tx = new Transaction({
+          recentBlockhash: latestBlockhash.blockhash,
+          feePayer: senderPublicKey,
+        }).add(
+          createTransferInstruction(
+            actualSenderTokenAccount,
+            recipientTokenAccountAddress,
+            senderPublicKey,
+            transferAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+
+        setTransferStatus('✍️ 지갑 서명을 기다리는 중 (토큰 전송)...');
+        console.debug('[DEBUG] 전송 트랜잭션:', tx);
+
+        const signed = await wallet.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
+        setTransferStatus('🔗 트랜잭션 확인 중...');
+        await connection.confirmTransaction({
+          signature: sig,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+        }, commitment);
+
+        console.debug('[DEBUG] 전송 완료:', sig);
+        alert(`🚀 SNAX 전송 성공! 트랜잭션: ${sig}`);
+        setTransferStatus('✅ 전송 완료!');
+      }
+
+      // 잔액 갱신
+      setTimeout(() => getSnaxBalance(walletAddress), 2000);
 
     } catch (error: any) {
       console.error('[ERROR] SNAX 토큰 전송 실패:', error);
-      
-      let errorMessage = '전송 실패';
-      
-      if (error.message?.includes('User rejected')) {
-        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
-      } else if (error.message?.includes('insufficient lamports')) {
-        errorMessage = 'SOL 잔액이 부족합니다. 가스비를 위한 SOL이 필요합니다.';
-      } else if (error.message?.includes('0x1') || error.message?.includes('insufficient funds')) {
-        errorMessage = 'SNAX 토큰 잔액이 부족합니다.';
-      } else if (error.message?.includes('Invalid')) {
-        errorMessage = '잘못된 주소 또는 계정입니다.';
-      } else {
-        errorMessage = `전송 실패: ${error.message || '알 수 없는 에러'}`;
-      }
-      
+      let errorMessage = `전송 실패: ${error.message || '알 수 없는 에러'}`;
+      if (error.message?.includes('User rejected')) errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+      if (error.message?.includes('insufficient lamports')) errorMessage = 'SOL 잔액이 부족합니다. 가스비가 필요합니다.';
+      // Phantom hook에서 오는 상세 문구를 로그로 보여달라고 요청
       setTransferStatus(`❌ ${errorMessage}`);
       alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [wallet, walletAddress, connection, snaxBalance, getSnaxBalance, commitment]);
+  }, [wallet, walletAddress, connection, getSnaxBalance, snaxBalance, commitment]);
 
   // SOL 가격 조회
   const getSolPrice = useCallback(async () => {
     try {
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-      const data = await response.json();
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+      const data = await res.json();
       setSolPrice(data.solana.usd);
     } catch (error) {
       console.error('SOL 가격 조회 실패:', error);
@@ -306,11 +268,9 @@ function App() {
         const address = response.publicKey.toString();
         setWallet(window.solana);
         setWalletAddress(address);
-        
         await getSolBalance(address);
         await getSnaxBalance(address);
         await getSolPrice();
-        
         alert('✅ Devnet으로 연결되었습니다!');
       } catch (error) {
         console.error('지갑 연결 실패:', error);
@@ -321,7 +281,6 @@ function App() {
     }
   }, [getSolBalance, getSnaxBalance, getSolPrice]);
 
-  // 자동 연결
   useEffect(() => {
     const autoConnect = async () => {
       if (window.solana?.isPhantom) {
@@ -333,28 +292,29 @@ function App() {
           getSolBalance(address);
           getSnaxBalance(address);
           getSolPrice();
-        } catch (error) {
-          console.log("자동 연결 실패: 사용자의 승인이 필요합니다.");
+        } catch {
+          console.log('자동 연결 실패: 사용자의 승인이 필요합니다.');
         }
       }
     };
     autoConnect();
   }, [getSolBalance, getSnaxBalance, getSolPrice]);
-  
+
   // 테스트 SOL 요청
   const requestTestSol = useCallback(async () => {
     if (!walletAddress) return;
     try {
       const latestBlockhash = await connection.getLatestBlockhash(commitment);
-      const signature = await connection.requestAirdrop(new PublicKey(walletAddress), 1e9); // 1 SOL
+      const signature = await connection.requestAirdrop(new PublicKey(walletAddress), 1e9);
       await connection.confirmTransaction({
-        signature: signature,
+        signature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
       }, commitment);
-      alert('테스트 SOL 요청이 성공했습니다! 잠시 후 잔액이 업데이트됩니다.');
-      setTimeout(() => getSolBalance(walletAddress), 5000);
+      alert('테스트 SOL 요청이 성공했습니다!');
+      setTimeout(() => getSolBalance(walletAddress), 3000);
     } catch (error) {
+      console.error(error);
       alert('테스트 SOL 요청에 실패했습니다.');
     }
   }, [walletAddress, connection, getSolBalance, commitment]);
@@ -364,7 +324,7 @@ function App() {
       <header className="App-header">
         <h1>🚀 Solana Test App</h1>
         <p>Phantom Wallet을 연결하고 SNAX 토큰을 전송해보세요!</p>
-        
+
         {!walletAddress ? (
           <WalletConnection onConnect={connectWallet} isLoading={isLoading} />
         ) : (
