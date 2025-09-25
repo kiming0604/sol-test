@@ -237,6 +237,9 @@ function App() {
       );
       console.log('[DEBUG] 전송 명령이 트랜잭션에 추가되었습니다.');
 
+      // ⭐ 추가된 코드: 트랜잭션 객체 전체를 로그에 출력합니다.
+      console.log('[DEBUG] 최종 트랜잭션 객체:', transaction); 
+
       // 트랜잭션 서명 및 전송
       setTransferStatus('✍️ 지갑 서명을 기다리는 중...');
       console.log('[DEBUG] 지갑 서명 요청');
