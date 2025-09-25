@@ -3,14 +3,14 @@ import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
-import { Buffer } from 'buffer';
-
-// ✅ Custom Solana 타입 정의 파일을 삭제하면, 아래 import가 정상적으로 동작합니다.
-import { Connection, PublicKey, Transaction, Commitment } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
 
 // Buffer polyfill
+import { Buffer } from 'buffer';
 window.Buffer = Buffer;
+
+// 솔라나 라이브러리 import (Commitment 타입 포함)
+import { Connection, PublicKey, Transaction, Commitment } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
 
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
@@ -38,9 +38,9 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
 
-  // ✅ Connection 생성자를 올바르게 수정했습니다.
-  const commitment: Commitment = 'confirmed';
-  const connection = useMemo(() => new Connection('https://api.devnet.solana.com', { commitment }), [commitment]);
+  // ✅ Connection 객체 생성 방식을 올바르게 수정했습니다.
+  const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
+  const commitment = 'confirmed'; // 이 변수는 아래 confirmTransaction에서 사용됩니다.
   
   // SNAX 토큰 잔액 조회
   const getSnaxBalance = useCallback(async (address: string) => {
@@ -87,8 +87,6 @@ function App() {
 
       const transferAmount = amount * Math.pow(10, 6);
       
-      const latestBlockhash = await connection.getLatestBlockhash(commitment);
-      
       const transaction = new Transaction().add(
         createTransferInstruction(
           senderTokenAccountAddress,
@@ -98,6 +96,7 @@ function App() {
         )
       );
 
+      const latestBlockhash = await connection.getLatestBlockhash(commitment);
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = senderPublicKey;
 
@@ -119,25 +118,10 @@ function App() {
 
     } catch (error: any) {
       console.error('SNAX 토큰 전송 실패:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        name: error.name,
-        stack: error.stack
-      });
-      
       let errorMessage = `전송 실패: ${error.message || '알 수 없는 에러'}`;
-      
-      if (error.message?.includes('User rejected') || error.code === 4001) {
+      if (error.message?.includes('User rejected')) {
         errorMessage = '사용자가 트랜잭션을 거부했습니다.';
-      } else if (error.message?.includes('insufficient funds')) {
-        errorMessage = '잔액이 부족합니다.';
-      } else if (error.message?.includes('Token account not found')) {
-        errorMessage = '토큰 계정을 찾을 수 없습니다.';
-      } else if (error.message?.includes('Invalid address')) {
-        errorMessage = '잘못된 주소입니다.';
       }
-      
       setTransferStatus(`❌ ${errorMessage}`);
       alert(errorMessage);
     } finally {
