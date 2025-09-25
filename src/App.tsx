@@ -3,14 +3,12 @@ import './App.css';
 import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
-
-// Buffer polyfill
 import { Buffer } from 'buffer';
-window.Buffer = Buffer;
-
-// 솔라나 라이브러리 import
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
+
+// Buffer polyfill
+window.Buffer = Buffer;
 
 // Phantom Wallet 타입 정의
 interface PhantomWallet {
