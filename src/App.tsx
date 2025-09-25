@@ -92,10 +92,7 @@ function App() {
       
       const latestBlockhash = await connection.getLatestBlockhash();
       
-      const transaction = new Transaction({
-        recentBlockhash: latestBlockhash.blockhash,
-        feePayer: senderPublicKey,
-      }).add(
+      const transaction = new Transaction().add(
         createTransferInstruction(
           senderTokenAccountAddress,
           recipientTokenAccountAddress,
@@ -103,6 +100,9 @@ function App() {
           transferAmount
         )
       );
+
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = senderPublicKey;
 
       setTransferStatus('✍️ 지갑 서명을 기다리는 중...');
 
