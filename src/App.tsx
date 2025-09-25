@@ -11,7 +11,7 @@ import {
   createTransferInstruction,
   TOKEN_2022_PROGRAM_ID,
   getAccount,
-  getMint, // 수정: getMint 함수 import
+  getMint,
   Account
 } from '@solana/spl-token';
 import { Buffer } from 'buffer';
@@ -31,7 +31,6 @@ declare global {
   }
 }
 
-// getAccount 타입 확장
 interface TokenAccount extends Account {
   amount: bigint;
   decimals: number;
@@ -43,7 +42,7 @@ function App() {
   const [solBalance, setSolBalance] = useState<number>(0);
   const [solPrice, setSolPrice] = useState<number>(0);
   const [snaxBalance, setSnaxBalance] = useState<number>(0);
-  const [snaxDecimals, setSnaxDecimals] = useState<number | null>(null); // 수정: decimals 저장할 state 추가
+  const [snaxDecimals, setSnaxDecimals] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
 
@@ -51,7 +50,6 @@ function App() {
   const commitment: Commitment = 'confirmed';
   const SNAX_MINT = 'ABMiM634jvK9tQp8nLmE7kNvCe7CvE7YupYiuWsdbGYV';
 
-  // SOL 잔액 조회
   const getSolBalance = useCallback(async (address: string) => {
     try {
       const balance = await connection.getBalance(new PublicKey(address), commitment);
@@ -61,7 +59,6 @@ function App() {
     }
   }, [connection, commitment]);
 
-  // SNAX 잔액 조회 (수정: decimals를 인자로 받도록 변경)
   const getSnaxBalance = useCallback(async (address: string, decimals: number | null) => {
     if (decimals === null) {
         setSnaxBalance(0);
@@ -83,15 +80,16 @@ function App() {
       setSnaxBalance(balance);
       return balance;
     } catch (error) {
-      // 사용자의 토큰 계정이 없는 경우 여기에 해당됩니다.
       console.log('[INFO] SNAX 토큰 계정이 없어 잔액을 0으로 설정합니다.');
       setSnaxBalance(0);
       return 0;
     }
   }, [connection, commitment]);
 
-  // SNAX 전송 (수정: state의 decimals 사용)
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
+    // 수정: isLoading이 true이면 함수를 즉시 종료하여 중복 실행 방지
+    if (isLoading) return;
+
     if (!wallet || !walletAddress || !wallet.signTransaction) {
       alert('지갑이 연결되어 있지 않거나 전송 기능을 지원하지 않습니다.');
       return;
@@ -108,19 +106,18 @@ function App() {
       const senderPublicKey = new PublicKey(walletAddress);
       const recipientPublicKey = new PublicKey(recipientAddress);
       const mintPublicKey = new PublicKey(SNAX_MINT);
-      const decimals = snaxDecimals; // 수정: state에서 decimals 가져오기
+      const decimals = snaxDecimals;
 
       const senderTokenAccount = await getAssociatedTokenAddress(mintPublicKey, senderPublicKey, false, TOKEN_2022_PROGRAM_ID);
       const recipientTokenAccount = await getAssociatedTokenAddress(mintPublicKey, recipientPublicKey, false, TOKEN_2022_PROGRAM_ID);
 
-      // 잔액 확인 로직은 여전히 필요
       const senderAccountInfo = await getAccount(connection, senderTokenAccount, commitment, TOKEN_2022_PROGRAM_ID) as TokenAccount;
       const actualBalance = Number(senderAccountInfo.amount) / (10 ** decimals);
 
       if (actualBalance < amount) {
         alert(`SNAX 잔액 부족: 현재 ${actualBalance} SNAX`);
         setTransferStatus('❌ 잔액 부족');
-        setIsLoading(false);
+        setIsLoading(false); // 로딩 상태를 다시 false로 변경
         return;
       }
 
@@ -144,7 +141,7 @@ function App() {
           senderTokenAccount,
           recipientTokenAccount,
           senderPublicKey,
-          BigInt(Math.floor(amount * (10 ** decimals))), // 수정: state의 decimals 사용
+          BigInt(Math.floor(amount * (10 ** decimals))),
           [],
           TOKEN_2022_PROGRAM_ID
         )
@@ -181,9 +178,8 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals]); // 수정: snaxDecimals 의존성 추가
+  }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals, isLoading]); // 수정: 의존성 배열에 isLoading 추가
 
-  // SOL 가격 조회
   const getSolPrice = useCallback(async () => {
     try {
       const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
@@ -194,7 +190,6 @@ function App() {
     }
   }, []);
 
-  // 지갑 연결 (수정: decimals 정보 조회 로직 추가)
   const connectWallet = useCallback(async () => {
     if (window.solana?.isPhantom) {
       try {
@@ -206,12 +201,10 @@ function App() {
         await getSolBalance(address);
         await getSolPrice();
         
-        // SNAX 토큰의 decimals 정보 가져오기
         const mintPublicKey = new PublicKey(SNAX_MINT);
         const mintInfo = await getMint(connection, mintPublicKey, commitment, TOKEN_2022_PROGRAM_ID);
         setSnaxDecimals(mintInfo.decimals);
         
-        // decimals 정보와 함께 잔액 조회
         await getSnaxBalance(address, mintInfo.decimals);
 
         alert('✅ Devnet 연결 성공!');
@@ -224,7 +217,6 @@ function App() {
     }
   }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment]);
 
-  // 자동 연결 (수정: decimals 정보 조회 로직 추가)
   useEffect(() => {
     const autoConnect = async () => {
       if (window.solana?.isPhantom) {
@@ -250,7 +242,6 @@ function App() {
     autoConnect();
   }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment]);
 
-  // 테스트 SOL 요청
   const requestTestSol = useCallback(async () => {
     if (!walletAddress) return;
     try {
@@ -284,7 +275,7 @@ function App() {
             solPrice={{ usd: solPrice, krw: solPrice * 1300 }}
             snaxBalance={snaxBalance}
             onSendSnaxTokens={sendSnaxTokens}
-            onRefreshSnaxBalance={() => getSnaxBalance(walletAddress, snaxDecimals)} // 수정: snaxDecimals 전달
+            onRefreshSnaxBalance={() => getSnaxBalance(walletAddress, snaxDecimals)}
             transferStatus={transferStatus}
             isLoading={isLoading}
             onDisconnect={() => {
@@ -293,7 +284,7 @@ function App() {
               setWalletAddress('');
               setSolBalance(0);
               setSnaxBalance(0);
-              setSnaxDecimals(null); // 수정: decimals 초기화
+              setSnaxDecimals(null);
               setTransferStatus('');
             }}
             onRequestTestSol={requestTestSol}
