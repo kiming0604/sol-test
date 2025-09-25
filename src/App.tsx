@@ -48,7 +48,7 @@ function App() {
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
 
-  // SNAX 토큰 잔액 조회 (수정된 버전)
+  // SNAX 토큰 잔액 조회
   const getSnaxBalance = useCallback(async (address: string) => {
     try {
       console.log('[DEBUG] getSnaxBalance 호출. 주소:', address);
@@ -203,37 +203,15 @@ function App() {
       
       setTransferStatus('⏳ 트랜잭션 생성 중...');
       
-      // 1. 받는 사람의 토큰 계정이 없는 경우, ATA 생성 트랜잭션 먼저 전송
+      // 1. 받는 사람의 토큰 계정이 없는 경우, ATA 생성 트랜잭션 전송 로직 대신 경고창 표시
       const recipientAccountInfo = await connection.getAccountInfo(recipientTokenAccountAddress, commitment);
       
       if (recipientAccountInfo === null) {
-        console.log('[DEBUG] 받는 사람 토큰 계정이 없어 ATA 생성 트랜잭션을 전송합니다.');
-        const latestBlockhash = await connection.getLatestBlockhash(commitment);
-        
-        const createAtaTransaction = new Transaction({
-          recentBlockhash: latestBlockhash.blockhash,
-          feePayer: senderPublicKey,
-        }).add(
-          createAssociatedTokenAccountInstruction(
-            senderPublicKey,
-            recipientTokenAccountAddress,
-            recipientPublicKey,
-            mintPublicKey
-          )
-        );
-        
-        console.log('[DEBUG] ATA 생성 트랜잭션 객체:', createAtaTransaction); 
-        
-        setTransferStatus('✍️ 지갑 서명을 기다리는 중 (ATA 생성)...');
-        const { signature: createAtaSignature } = await wallet.signAndSendTransaction(createAtaTransaction);
-        
-        setTransferStatus('🔗 ATA 생성 트랜잭션 확인 중...');
-        await connection.confirmTransaction({
-          signature: createAtaSignature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-        }, commitment);
-        console.log('[DEBUG] ATA 생성 트랜잭션 확인 완료:', createAtaSignature);
+        alert('받는 사람의 SNAX 토큰 계정(ATA)이 없습니다. 전송을 계속하기 전에 수동으로 토큰을 추가해주세요.');
+        setIsLoading(false);
+        setTransferStatus('❌ 전송 실패: 수신자 ATA가 없음.');
+        console.error('오류: 수신자 ATA가 존재하지 않습니다. 사용자에게 수동 생성을 요청합니다.');
+        return;
       } else {
         console.log('[DEBUG] 받는 사람 토큰 계정이 이미 존재합니다.');
       }
