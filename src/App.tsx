@@ -4,7 +4,6 @@ import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
 
-// 솔라나 라이브러리 import
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -95,19 +94,32 @@ function App() {
         feePayer: senderPublicKey,
       });
 
-      // ✅ 받는 사람의 토큰 계정이 없는 경우, 계정 생성 명령어 추가
+      // ✅ 보내는 사람의 토큰 계정 확인 및 생성
+      const senderTokenAccountInfo = await connection.getAccountInfo(senderTokenAccountAddress);
+      if (senderTokenAccountInfo === null) {
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            senderPublicKey,
+            senderTokenAccountAddress,
+            senderPublicKey,
+            mintPublicKey
+          )
+        );
+      }
+
+      // ✅ 받는 사람의 토큰 계정 확인 및 생성
       const recipientTokenAccountInfo = await connection.getAccountInfo(recipientTokenAccountAddress);
       if (recipientTokenAccountInfo === null) {
         transaction.add(
           createAssociatedTokenAccountInstruction(
             senderPublicKey,
             recipientTokenAccountAddress,
-            recipientPublicKey, // ✅ 'owner' 인자 추가
-            mintPublicKey       // ✅ 'mint' 인자 추가
+            recipientPublicKey,
+            mintPublicKey
           )
         );
       }
-
+      
       transaction.add(
         createTransferInstruction(
           senderTokenAccountAddress,
