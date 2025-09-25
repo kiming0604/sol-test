@@ -52,10 +52,7 @@ function App() {
 
       const tokenAccountAddress = await getAssociatedTokenAddress(
         mintPublicKey,
-        ownerPublicKey,
-        false,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
+        ownerPublicKey
       );
 
       const accountInfo = await connection.getAccountInfo(tokenAccountAddress, commitment);
@@ -140,10 +137,7 @@ function App() {
       // 수신자 ATA 주소
       const recipientTokenAccountAddress = await getAssociatedTokenAddress(
         mintPublicKey,
-        recipientPublicKey,
-        false,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
+        recipientPublicKey
       );
 
       const transferAmount = BigInt(Math.floor(amount * Math.pow(10, decimals)));
@@ -161,9 +155,7 @@ function App() {
             senderPublicKey,
             recipientTokenAccountAddress,
             recipientPublicKey,
-            mintPublicKey,
-            TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID
+            mintPublicKey
           )
         );
       }
@@ -173,9 +165,7 @@ function App() {
           actualSenderTokenAccount,
           recipientTokenAccountAddress,
           senderPublicKey,
-          transferAmount,
-          [],
-          TOKEN_PROGRAM_ID
+          transferAmount
         )
       );
 
