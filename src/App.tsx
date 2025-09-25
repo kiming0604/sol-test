@@ -4,7 +4,7 @@ import WalletConnection from './components/WalletConnection';
 import WalletInfo from './components/WalletInfo';
 import { COUNTER_PROGRAM_ID } from './types/counter';
 
-// Buffer polyfill
+// Buffer polyfill은 모든 import 문 바로 아래에 위치해야 합니다.
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
@@ -38,8 +38,8 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
 
-  const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment = 'confirmed';
+  const connection = useMemo(() => new Connection('https://api.devnet.solana.com', commitment), [commitment]);
   
   // SNAX 토큰 잔액 조회
   const getSnaxBalance = useCallback(async (address: string) => {
@@ -48,23 +48,23 @@ function App() {
       const ownerPublicKey = new PublicKey(address);
       const tokenAccountAddress = await getAssociatedTokenAddress(mintPublicKey, ownerPublicKey, true);
       
-      const balance = await connection.getTokenAccountBalance(tokenAccountAddress);
+      const balance = await connection.getTokenAccountBalance(tokenAccountAddress, commitment);
       setSnaxBalance(balance.value.uiAmount || 0);
     } catch (error) {
       setSnaxBalance(0);
       console.log('SNAX 토큰 계정을 찾을 수 없거나 잔액 조회에 실패했습니다.');
     }
-  }, [connection]);
+  }, [connection, commitment]);
 
   // SOL 잔액 조회
   const getSolBalance = useCallback(async (address: string) => {
     try {
-      const balance = await connection.getBalance(new PublicKey(address));
+      const balance = await connection.getBalance(new PublicKey(address), commitment);
       setSolBalance(balance / 1e9);
     } catch (error) {
       console.error('SOL 잔액 조회 실패:', error);
     }
-  }, [connection]);
+  }, [connection, commitment]);
 
   // SNAX 토큰 전송 함수
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
@@ -86,6 +86,8 @@ function App() {
 
       const transferAmount = amount * Math.pow(10, 6);
       
+      const latestBlockhash = await connection.getLatestBlockhash(commitment);
+      
       const transaction = new Transaction().add(
         createTransferInstruction(
           senderTokenAccountAddress,
@@ -95,7 +97,6 @@ function App() {
         )
       );
 
-      const latestBlockhash = await connection.getLatestBlockhash();
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = senderPublicKey;
 
@@ -186,7 +187,7 @@ function App() {
   const requestTestSol = useCallback(async () => {
     if (!walletAddress) return;
     try {
-      const latestBlockhash = await connection.getLatestBlockhash();
+      const latestBlockhash = await connection.getLatestBlockhash(commitment);
       const signature = await connection.requestAirdrop(new PublicKey(walletAddress), 1e9); // 1 SOL
       await connection.confirmTransaction({
         signature: signature,
