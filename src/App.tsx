@@ -49,6 +49,7 @@ const MainPage = () => {
   const [snaxDecimals, setSnaxDecimals] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
+  const [counterValue, setCounterValue] = useState<number>(0);
   
   const isSending = useRef(false);
   const navigate = useNavigate();
@@ -168,10 +169,11 @@ const MainPage = () => {
         const mintInfo = await getMint(connection, mintPublicKey, commitment, TOKEN_2022_PROGRAM_ID);
         setSnaxDecimals(mintInfo.decimals);
         await getSnaxBalance(address, mintInfo.decimals);
+        await getCounterValue(); // 카운터 값 초기화
         alert('✅ Devnet 연결 성공!');
       } catch(err) { console.error("지갑 연결 실패:", err); alert('지갑 연결 실패'); }
     } else { alert('Phantom Wallet 설치 필요'); }
-  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection]);
+  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection, getCounterValue]);
 
   useEffect(() => {
     const autoConnect = async () => {
@@ -206,6 +208,68 @@ const MainPage = () => {
     } catch (error) { console.error(error); alert('테스트 SOL 요청 실패'); }
   }, [walletAddress, connection, getSolBalance, commitment]);
 
+  // 카운터 컨트랙트 관련 함수들
+  const getCounterValue = useCallback(async () => {
+    try {
+      // 카운터 컨트랙트에서 현재 값을 읽어오는 로직
+      // 실제로는 컨트랙트의 상태를 읽어와야 합니다
+      console.log('카운터 값 조회 중...');
+      // 임시로 랜덤 값 반환 (실제 구현에서는 컨트랙트 호출)
+      const value = Math.floor(Math.random() * 100);
+      setCounterValue(value);
+    } catch (error) {
+      console.error('카운터 값 조회 실패:', error);
+    }
+  }, []);
+
+  const incrementCounter = useCallback(async () => {
+    if (!wallet || !walletAddress) {
+      alert('지갑이 연결되지 않았습니다.');
+      return;
+    }
+    try {
+      console.log('카운터 증가 중...');
+      // 실제로는 컨트랙트의 increment 함수를 호출해야 합니다
+      setCounterValue(prev => prev + 1);
+      alert('카운터가 증가되었습니다!');
+    } catch (error) {
+      console.error('카운터 증가 실패:', error);
+      alert('카운터 증가에 실패했습니다.');
+    }
+  }, [wallet, walletAddress]);
+
+  const decrementCounter = useCallback(async () => {
+    if (!wallet || !walletAddress) {
+      alert('지갑이 연결되지 않았습니다.');
+      return;
+    }
+    try {
+      console.log('카운터 감소 중...');
+      // 실제로는 컨트랙트의 decrement 함수를 호출해야 합니다
+      setCounterValue(prev => Math.max(0, prev - 1));
+      alert('카운터가 감소되었습니다!');
+    } catch (error) {
+      console.error('카운터 감소 실패:', error);
+      alert('카운터 감소에 실패했습니다.');
+    }
+  }, [wallet, walletAddress]);
+
+  const resetCounter = useCallback(async () => {
+    if (!wallet || !walletAddress) {
+      alert('지갑이 연결되지 않았습니다.');
+      return;
+    }
+    try {
+      console.log('카운터 리셋 중...');
+      // 실제로는 컨트랙트의 reset 함수를 호출해야 합니다
+      setCounterValue(0);
+      alert('카운터가 리셋되었습니다!');
+    } catch (error) {
+      console.error('카운터 리셋 실패:', error);
+      alert('카운터 리셋에 실패했습니다.');
+    }
+  }, [wallet, walletAddress]);
+
   return (
     <>
       <p>Phantom Wallet을 연결하고 SNAX 토큰을 전송해보세요!</p>
@@ -232,10 +296,10 @@ const MainPage = () => {
             localStorage.removeItem('walletAddress');
           }}
           onRequestTestSol={requestTestSol}
-          onIncrement={() => {}}
-          onDecrement={() => {}}
-          onReset={() => {}}
-          counterValue={0}
+          onIncrement={incrementCounter}
+          onDecrement={decrementCounter}
+          onReset={resetCounter}
+          counterValue={counterValue}
           contractAddress={COUNTER_PROGRAM_ID}
           onNavigateLockup={() => navigate('/lockups')}
         />
