@@ -17,6 +17,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  box-sizing: border-box; /* 패딩이 전체 높이에 포함되도록 설정 */
 }
 
 h1 {
@@ -31,7 +32,7 @@ h2 {
   color: #f0f0f0;
 }
 
-.connect-button, .disconnect-button {
+.connect-button {
   background: linear-gradient(45deg, #ff6b6b, #ee5a24);
   border: none;
   color: white;
@@ -45,12 +46,18 @@ h2 {
   margin: 10px;
 }
 
-.connect-button:hover, .disconnect-button:hover {
+.connect-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-.wallet-status {
+.connect-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.wallet-status, .status-message {
   margin-top: 15px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.1);
@@ -79,25 +86,13 @@ h2 {
   100% { opacity: 1; }
 }
 
-.connect-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-
-.disconnect-button {
-  background: linear-gradient(45deg, #6c5ce7, #a29bfe);
-  margin-top: 20px;
-}
-
 .wallet-info {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border-radius: 20px;
   padding: 30px;
   max-width: 600px;
-  width: 100%;
+  width: 90%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -126,6 +121,7 @@ h2 {
   padding: 8px;
   border-radius: 5px;
   margin: 0;
+  display: inline-block; /* span 태그에 적용하기 위해 */
 }
 
 .balance {
@@ -161,6 +157,7 @@ h2 {
 }
 
 .counter-section h3 {
+  margin-top: 0;
   margin-bottom: 15px;
   color: #f0f0f0;
   font-size: 1.3rem;
@@ -220,54 +217,78 @@ h2 {
   background: linear-gradient(45deg, #fd79a8, #fdcb6e);
 }
 
-/* 반응형 디자인 */
-@media (max-width: 768px) {
-  h1 {
-    font-size: 2rem;
-  }
-  
-  h2 {
-    font-size: 1.5rem;
-  }
-  
-  .wallet-info {
-    margin: 0 20px;
-    padding: 20px;
-  }
-  
-  .connect-button, .disconnect-button {
-    padding: 12px 24px;
-    font-size: 1rem;
-  }
+/* --- 버튼 그룹 및 전송 UI 스타일 (수정 및 추가) --- */
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 25px 0;
 }
 
-/* 애니메이션 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.button-group button, .disconnect-button {
+  background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  margin: 5px;
 }
 
-.wallet-info {
-  animation: fadeIn 0.5s ease-out;
+.button-group button:hover, .disconnect-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-.info-item {
-  animation: fadeIn 0.5s ease-out;
-  animation-fill-mode: both;
+.disconnect-button {
+  background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+  margin-top: 20px;
 }
 
-.info-item:nth-child(1) { animation-delay: 0.1s; }
-.info-item:nth-child(2) { animation-delay: 0.2s; }
-.info-item:nth-child(3) { animation-delay: 0.3s; }
-.info-item:nth-child(4) { animation-delay: 0.4s; }
-.info-item:nth-child(5) { animation-delay: 0.5s; }
+.refresh-btn {
+  background: none;
+  box-shadow: none;
+  padding: 5px;
+  font-size: 1.2rem;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+.refresh-btn:hover {
+  transform: rotate(180deg);
+}
 
+.send-container {
+  margin-top: 25px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.send-container input {
+  flex: 1;
+  min-width: 200px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 1rem;
+}
+
+.send-container button {
+  background: linear-gradient(45deg, #fd79a8, #fdcb6e);
+  padding: 12px 20px;
+  font-size: 1rem;
+}
 
 /* --- LockupPage.tsx를 위한 스타일 추가 --- */
 .lockup-container {
@@ -290,7 +311,7 @@ h2 {
 }
 
 .lockup-table th, .lockup-table td {
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding: 12px 15px;
   text-align: center;
 }
@@ -301,10 +322,46 @@ h2 {
   font-weight: bold;
 }
 
-.lockup-table tr:nth-child(even) {
-  background-color: rgba(0, 0, 0, 0.1);
+.lockup-table tr:last-child td {
+    border-bottom: none;
 }
 
 .lockup-table tr:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
+
+/* --- 반응형 디자인 --- */
+@media (max-width: 768px) {
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+  .wallet-info, .lockup-container {
+    margin: 20px;
+    padding: 20px;
+    width: calc(100% - 40px);
+  }
+  .connect-button, .disconnect-button {
+    padding: 12px 24px;
+    font-size: 1rem;
+  }
+}
+
+/* --- 애니메이션 --- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wallet-info {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.info-item {
+  animation: fadeIn 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.info-item:nth-child(1) { animation-delay: 0.1s; }
+.info-item:nth-child(2) { animation-delay: 0.2s; }
+.info-item:nth-child(3) { animation-delay: 0.3s; }
+.info-item:nth-child(4) { animation-delay: 0.4s; }
+.info-item:nth-child(5) { animation-delay: 0.5s; }
