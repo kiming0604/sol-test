@@ -57,7 +57,7 @@ function MainPage() {
 
   const notifyBackendOfConnection = useCallback(async (address: string) => {
     try {
-      await axios.post('https://Sol-test-backend-api-env.eba-a9fyuvxs.ap-northeast-2.elasticbeanstalk.com/api/wallet/connect', {
+      await axios.post('https://dh288s2n217f7.cloudfront.net/api/wallet/connect', {
         walletAddress: address
       });
       console.log(`백엔드에 [${address}] 지갑 연결을 알렸습니다.`);
