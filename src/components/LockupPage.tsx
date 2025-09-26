@@ -28,7 +28,7 @@ function LockupPage() {
       setWalletAddress(storedWalletAddress);
       
       // 2. 백엔드 API를 호출하여 락업 데이터를 가져옵니다.
-      axios.get(`http://localhost:8080/api/lockups/${storedWalletAddress}`)
+      axios.get(`https://localhost:8080/api/lockups/${storedWalletAddress}`)
         .then(response => {
           setLockups(response.data); // 성공 시 데이터를 state에 저장
         })

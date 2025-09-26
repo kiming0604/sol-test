@@ -57,7 +57,7 @@ function MainPage() {
 
   const notifyBackendOfConnection = useCallback(async (address: string) => {
     try {
-      await axios.post('http://localhost:8080/api/wallet/connect', {
+      await axios.post('https://localhost:8080/api/wallet/connect', {
         walletAddress: address
       });
       console.log(`백엔드에 [${address}] 지갑 연결을 알렸습니다.`);
