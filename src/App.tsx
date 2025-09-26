@@ -154,27 +154,6 @@ const MainPage = () => {
     } catch (error) { console.error('SOL 가격 조회 실패:', error); }
   }, []);
 
-  const connectWallet = useCallback(async () => {
-    if (window.solana?.isPhantom) {
-      try {
-        const response = await window.solana.connect();
-        const address = response.publicKey.toString();
-        setWallet(window.solana);
-        setWalletAddress(address);
-        localStorage.setItem('walletAddress', address);
-        await notifyBackendOfConnection(address);
-        await getSolBalance(address);
-        await getSolPrice();
-        const mintPublicKey = new PublicKey(SNAX_MINT);
-        const mintInfo = await getMint(connection, mintPublicKey, commitment, TOKEN_2022_PROGRAM_ID);
-        setSnaxDecimals(mintInfo.decimals);
-        await getSnaxBalance(address, mintInfo.decimals);
-        await getCounterValue(); // 카운터 값 초기화
-        alert('✅ Devnet 연결 성공!');
-      } catch(err) { console.error("지갑 연결 실패:", err); alert('지갑 연결 실패'); }
-    } else { alert('Phantom Wallet 설치 필요'); }
-  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection, getCounterValue]);
-
   useEffect(() => {
     const autoConnect = async () => {
       if (window.solana?.isPhantom) {
@@ -221,6 +200,27 @@ const MainPage = () => {
       console.error('카운터 값 조회 실패:', error);
     }
   }, []);
+
+  const connectWallet = useCallback(async () => {
+    if (window.solana?.isPhantom) {
+      try {
+        const response = await window.solana.connect();
+        const address = response.publicKey.toString();
+        setWallet(window.solana);
+        setWalletAddress(address);
+        localStorage.setItem('walletAddress', address);
+        await notifyBackendOfConnection(address);
+        await getSolBalance(address);
+        await getSolPrice();
+        const mintPublicKey = new PublicKey(SNAX_MINT);
+        const mintInfo = await getMint(connection, mintPublicKey, commitment, TOKEN_2022_PROGRAM_ID);
+        setSnaxDecimals(mintInfo.decimals);
+        await getSnaxBalance(address, mintInfo.decimals);
+        await getCounterValue(); // 카운터 값 초기화
+        alert('✅ Devnet 연결 성공!');
+      } catch(err) { console.error("지갑 연결 실패:", err); alert('지갑 연결 실패'); }
+    } else { alert('Phantom Wallet 설치 필요'); }
+  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection, getCounterValue]);
 
   const incrementCounter = useCallback(async () => {
     if (!wallet || !walletAddress) {
