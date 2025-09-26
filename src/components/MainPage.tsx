@@ -47,7 +47,7 @@ function MainPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
   
-  // 1. useRef를 이용한 잠금 변수 생성
+  // 중복 전송을 막기 위한 useRef 잠금 변수
   const isSending = useRef(false);
   const navigate = useNavigate();
 
@@ -94,18 +94,18 @@ function MainPage() {
     }
   }, [connection, commitment]);
 
+  // --- 사용자가 제공한 안정적인 버전의 sendSnaxTokens 함수 ---
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
-    // 2. 함수 시작 시 isSending ref를 확인하여 중복 실행 차단
     if (isSending.current) {
-      console.warn("전송이 이미 진행 중이므로 중복 요청을 차단합니다.");
-      return;
+        console.warn("전송이 이미 진행 중이므로 중복 요청을 차단합니다.");
+        return;
     }
+
     if (!wallet || !walletAddress || !wallet.signTransaction || snaxDecimals === null) {
       alert('지갑이 연결되지 않았거나 토큰 정보가 로드되지 않았습니다.');
       return;
     }
     
-    // 3. 잠금 시작
     isSending.current = true;
     setIsLoading(true);
     setTransferStatus('🚀 트랜잭션 준비중...');
@@ -123,7 +123,7 @@ function MainPage() {
       try {
         const senderAccountInfo = await getAccount(connection, senderTokenAccount, commitment, TOKEN_2022_PROGRAM_ID) as TokenAccount;
         actualBalance = Number(senderAccountInfo.amount) / (10 ** decimals);
-      } catch (e) {}
+      } catch (e) { /* 잔액 조회 실패 시 0으로 처리 */ }
 
       if (actualBalance < amount) {
         alert(`SNAX 잔액 부족: 현재 ${actualBalance} SNAX`);
@@ -159,6 +159,7 @@ function MainPage() {
       if (window.confirm("🚀 SNAX 전송 성공!\n\nSolscan에서 트랜잭션을 확인하시겠습니까?")) {
         window.open(solscanUrl, '_blank', 'noopener,noreferrer');
       }
+
     } catch (error: any) {
       console.error('[ERROR] SNAX 전송 실패:', error);
       let msg = error.message || '알 수 없는 오류';
@@ -166,11 +167,11 @@ function MainPage() {
       setTransferStatus(`❌ ${msg}`);
       alert(msg);
     } finally {
-      // 4. 모든 작업이 끝나면 반드시 잠금 해제
       isSending.current = false;
       setIsLoading(false);
     }
   }, [wallet, walletAddress, connection, getSnaxBalance, commitment, snaxDecimals]);
+  // --- 여기까지 사용자가 제공한 안정적인 함수 ---
 
   const getSolPrice = useCallback(async () => {
     try {
