@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PublicKey } from '@solana/web3.js';
 
-// --- 이 부분이 가장 중요합니다! ---
-// WalletInfo 컴포넌트가 어떤 종류의 데이터를 받을지 정의하는 인터페이스입니다.
+// WalletInfo 컴포넌트가 받을 모든 데이터의 타입을 정의합니다.
 interface WalletInfoProps {
     walletAddress: string;
     solBalance: number;
@@ -20,9 +19,9 @@ interface WalletInfoProps {
     onReset: () => void;
     counterValue: number;
     contractAddress: string;
+    onNavigateLockup: () => void; // 페이지 이동 함수 타입 추가
 }
   
-// --- 컴포넌트 선언부에 React.FC<WalletInfoProps>를 명시합니다. ---
 const WalletInfo: React.FC<WalletInfoProps> = ({
   walletAddress,
   solBalance,
@@ -34,11 +33,17 @@ const WalletInfo: React.FC<WalletInfoProps> = ({
   isLoading,
   onDisconnect,
   onRequestTestSol,
+  onNavigateLockup, // props 받기
+  // counter 관련 props는 현재 사용하지 않지만, 에러 방지를 위해 받아줍니다.
+  onIncrement,
+  onDecrement,
+  onReset,
+  counterValue,
+  contractAddress,
 }) => {
   const [sendAmount, setSendAmount] = useState<number>(10000);
   const [recipient, setRecipient] = useState<string>('');
   const [showRecipientInput, setShowRecipientInput] = useState<boolean>(false);
-  const navigate = useNavigate();
 
   const handleSend = () => {
     if (!recipient) {
@@ -53,22 +58,42 @@ const WalletInfo: React.FC<WalletInfoProps> = ({
     }
   };
 
-  const goToLockupPage = () => {
-    navigate('/lockups');
-  };
-
   return (
     <div className="wallet-info">
-      <p><strong>내 지갑 주소:</strong> <span className="address">{walletAddress}</span></p>
-      <p>
-        <strong>SOL 잔액:</strong> <span className="balance">{solBalance.toFixed(4)} SOL</span> (${(solBalance * solPrice.usd).toFixed(2)})
-      </p>
-      <p>
-        <strong>SNAX 토큰 잔액:</strong> <span className="balance">{snaxBalance.toLocaleString()} SNAX</span>
+      {/* 기존에 있던 모든 정보 표시 UI를 복구합니다. */}
+      <div className="info-item">
+        <strong>내 지갑 주소</strong>
+        <p className="address">{walletAddress}</p>
+      </div>
+
+      <div className="info-item">
+        <strong>SOL 잔액</strong>
+        <p className="balance">{solBalance.toFixed(4)} SOL</p>
+        <p className="price-info">≈ ${(solBalance * solPrice.usd).toFixed(2)} USD</p>
+      </div>
+      
+      <div className="info-item">
+        <strong>SNAX 토큰 잔액</strong>
+        <p className="balance">{snaxBalance.toLocaleString()} SNAX</p>
         <button onClick={onRefreshSnaxBalance} disabled={isLoading} className="refresh-btn">
           🔄
         </button>
-      </p>
+      </div>
+
+      {/* 카운터 섹션도 다시 추가합니다. */}
+      <div className="counter-section">
+        <h3>Counter Contract</h3>
+        <p className="contract-address">{contractAddress}</p>
+        <div className="counter-display">
+            <p className="counter-value">{counterValue}</p>
+        </div>
+        <div className="counter-buttons">
+            <button onClick={onIncrement} className="counter-btn increment">+</button>
+            <button onClick={onDecrement} className="counter-btn decrement">-</button>
+            <button onClick={onReset} className="counter-btn reset">Reset</button>
+        </div>
+      </div>
+
 
       <div className="button-group">
         <button onClick={onRequestTestSol} disabled={isLoading}>
@@ -77,11 +102,8 @@ const WalletInfo: React.FC<WalletInfoProps> = ({
         <button onClick={() => setShowRecipientInput(!showRecipientInput)} disabled={isLoading}>
           SNAX 토큰 보내기
         </button>
-        <button onClick={goToLockupPage} disabled={isLoading}>
+        <button onClick={onNavigateLockup} disabled={isLoading}>
           락업 정보 확인
-        </button>
-        <button onClick={onDisconnect} className="disconnect-btn">
-          연결 해제
         </button>
       </div>
 
@@ -107,6 +129,10 @@ const WalletInfo: React.FC<WalletInfoProps> = ({
       )}
 
       {transferStatus && <p className="status-message">{transferStatus}</p>}
+      
+      <button onClick={onDisconnect} className="disconnect-button">
+        연결 해제
+      </button>
     </div>
   );
 };

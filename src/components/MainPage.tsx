@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // useNavigate import 추가
 import '../App.css';
 import WalletConnection from './WalletConnection';
 import WalletInfo from './WalletInfo';
@@ -36,7 +37,7 @@ interface TokenAccount extends Account {
     decimals: number;
 }
 
-function MainPage() { 
+function MainPage() {
   const [wallet, setWallet] = useState<PhantomWallet | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [solBalance, setSolBalance] = useState<number>(0);
@@ -47,6 +48,7 @@ function MainPage() {
   const [transferStatus, setTransferStatus] = useState<string>('');
   
   const isSending = useRef(false);
+  const navigate = useNavigate(); // useNavigate 훅 초기화
 
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
@@ -279,6 +281,7 @@ function MainPage() {
             onReset={() => {}}
             counterValue={0}
             contractAddress={COUNTER_PROGRAM_ID}
+            onNavigateLockup={() => navigate('/lockups')} // 페이지 이동 함수 전달
           />
         )}
     </>

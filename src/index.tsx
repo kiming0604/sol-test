@@ -10,9 +10,12 @@ const root = ReactDOM.createRoot(
 );
 
 root.render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
+  // StrictMode는 잠시 꺼두거나, 유지하셔도 새 코드는 문제 없습니다.
+  // <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  // </React.StrictMode>
 );
 
 reportWebVitals();
