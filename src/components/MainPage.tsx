@@ -6,7 +6,7 @@ import WalletConnection from './WalletConnection';
 import WalletInfo from './WalletInfo';
 import { COUNTER_PROGRAM_ID } from '../types/counter';
 
-import { Connection, PublicKey, Transaction, Commitment } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, Commitment, TransactionInstruction } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
@@ -46,7 +46,8 @@ function MainPage() {
   const [snaxDecimals, setSnaxDecimals] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
-  
+  const [counterValue, setCounterValue] = useState<number>(0);
+
   // 중복 전송을 막기 위한 useRef 잠금 변수
   const isSending = useRef(false);
   const navigate = useNavigate();
@@ -183,6 +184,53 @@ function MainPage() {
     }
   }, []);
 
+  const getCounterValue = useCallback(async () => {
+    try {
+      const counterPubkey = new PublicKey(COUNTER_PROGRAM_ID);
+      const counterInfo = await connection.getAccountInfo(counterPubkey);
+      if (counterInfo) {
+        // Assuming the count is the first 8 bytes of the data
+        const count = counterInfo.data.readUInt32LE(0);
+        setCounterValue(count);
+      }
+    } catch (error) {
+      console.error('Error getting counter value:', error);
+    }
+  }, [connection]);
+
+
+  const handleCounterInstruction = useCallback(async (instruction: Buffer) => {
+    if (!wallet || !walletAddress || !wallet.signTransaction) {
+      alert('지갑이 연결되지 않았습니다.');
+      return;
+    }
+
+    try {
+      const tx = new Transaction().add(
+        new TransactionInstruction({
+          keys: [{ pubkey: new PublicKey(walletAddress), isSigner: true, isWritable: false }],
+          programId: new PublicKey(COUNTER_PROGRAM_ID),
+          data: instruction,
+        })
+      );
+
+      const latestBlockhash = await connection.getLatestBlockhash(commitment);
+      tx.recentBlockhash = latestBlockhash.blockhash;
+      tx.feePayer = new PublicKey(walletAddress);
+
+      const signed = await wallet.signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+      await connection.confirmTransaction({ signature: sig, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight }, commitment);
+      getCounterValue();
+    } catch (error) {
+      console.error('Counter instruction failed:', error);
+    }
+  }, [wallet, walletAddress, connection, commitment, getCounterValue]);
+
+  const onIncrement = () => handleCounterInstruction(Buffer.from([0]));
+  const onDecrement = () => handleCounterInstruction(Buffer.from([1]));
+  const onReset = () => handleCounterInstruction(Buffer.from([2]));
+
   const connectWallet = useCallback(async () => {
     if (window.solana?.isPhantom) {
       try {
@@ -195,6 +243,7 @@ function MainPage() {
         await notifyBackendOfConnection(address);
         await getSolBalance(address);
         await getSolPrice();
+        await getCounterValue();
         
         const mintPublicKey = new PublicKey(SNAX_MINT);
         const mintInfo = await getMint(connection, mintPublicKey, commitment, TOKEN_2022_PROGRAM_ID);
@@ -210,7 +259,7 @@ function MainPage() {
     } else {
       alert('Phantom Wallet 설치 필요');
     }
-  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection]);
+  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection, getCounterValue]);
 
   useEffect(() => {
     const autoConnect = async () => {
@@ -225,6 +274,7 @@ function MainPage() {
           await notifyBackendOfConnection(addr);
           getSolBalance(addr);
           getSolPrice();
+          getCounterValue();
 
           const mintPublicKey = new PublicKey(SNAX_MINT);
           const mintInfo = await getMint(connection, mintPublicKey, commitment, TOKEN_2022_PROGRAM_ID);
@@ -236,7 +286,7 @@ function MainPage() {
       }
     };
     autoConnect();
-  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection]);
+  }, [getSolBalance, getSnaxBalance, getSolPrice, connection, commitment, notifyBackendOfConnection, getCounterValue]);
 
   const requestTestSol = useCallback(async () => {
     if (!walletAddress) return;
@@ -282,10 +332,10 @@ function MainPage() {
               localStorage.removeItem('walletAddress');
             }}
             onRequestTestSol={requestTestSol}
-            onIncrement={() => {}}
-            onDecrement={() => {}}
-            onReset={() => {}}
-            counterValue={0}
+            onIncrement={onIncrement}
+            onDecrement={onDecrement}
+            onReset={onReset}
+            counterValue={counterValue}
             contractAddress={COUNTER_PROGRAM_ID}
             onNavigateLockup={() => navigate('/lockups')}
           />
