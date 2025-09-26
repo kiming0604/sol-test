@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // useNavigate import 추가
+import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import WalletConnection from './WalletConnection';
 import WalletInfo from './WalletInfo';
@@ -47,8 +47,9 @@ function MainPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>('');
   
+  // 1. useRef를 이용한 잠금 변수 생성
   const isSending = useRef(false);
-  const navigate = useNavigate(); // useNavigate 훅 초기화
+  const navigate = useNavigate();
 
   const connection = useMemo(() => new Connection('https://api.devnet.solana.com', 'confirmed'), []);
   const commitment: Commitment = 'confirmed';
@@ -94,12 +95,17 @@ function MainPage() {
   }, [connection, commitment]);
 
   const sendSnaxTokens = useCallback(async (amount: number, recipientAddress: string) => {
-    if (isSending.current) return;
+    // 2. 함수 시작 시 isSending ref를 확인하여 중복 실행 차단
+    if (isSending.current) {
+      console.warn("전송이 이미 진행 중이므로 중복 요청을 차단합니다.");
+      return;
+    }
     if (!wallet || !walletAddress || !wallet.signTransaction || snaxDecimals === null) {
       alert('지갑이 연결되지 않았거나 토큰 정보가 로드되지 않았습니다.');
       return;
     }
     
+    // 3. 잠금 시작
     isSending.current = true;
     setIsLoading(true);
     setTransferStatus('🚀 트랜잭션 준비중...');
@@ -122,6 +128,7 @@ function MainPage() {
       if (actualBalance < amount) {
         alert(`SNAX 잔액 부족: 현재 ${actualBalance} SNAX`);
         setTransferStatus('❌ 잔액 부족');
+        // finally 블록에서 잠금이 해제되므로 여기서 바로 return
         return;
       }
 
@@ -149,10 +156,7 @@ function MainPage() {
       setTimeout(() => getSnaxBalance(walletAddress, decimals), 2000);
 
       const solscanUrl = `https://solscan.io/tx/${sig}?cluster=devnet`;
-      const userConfirmation = window.confirm(
-        "🚀 SNAX 전송 성공!\n\nSolscan에서 트랜잭션을 확인하시겠습니까?"
-      );
-      if (userConfirmation) {
+      if (window.confirm("🚀 SNAX 전송 성공!\n\nSolscan에서 트랜잭션을 확인하시겠습니까?")) {
         window.open(solscanUrl, '_blank', 'noopener,noreferrer');
       }
     } catch (error: any) {
@@ -162,6 +166,7 @@ function MainPage() {
       setTransferStatus(`❌ ${msg}`);
       alert(msg);
     } finally {
+      // 4. 모든 작업이 끝나면 반드시 잠금 해제
       isSending.current = false;
       setIsLoading(false);
     }
@@ -281,7 +286,7 @@ function MainPage() {
             onReset={() => {}}
             counterValue={0}
             contractAddress={COUNTER_PROGRAM_ID}
-            onNavigateLockup={() => navigate('/lockups')} // 페이지 이동 함수 전달
+            onNavigateLockup={() => navigate('/lockups')}
           />
         )}
     </>
